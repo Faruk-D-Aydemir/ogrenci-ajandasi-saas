@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Destekli Öğrenci Ajandası</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>AI Destekli Öğrenci Ajandası</h1>
+        <p>Gelecek sınavlarına planlı hazırlan!</p>
+    </header>
+
+    <main>
+        <h2>Yeni Sınav/Quiz Girişi Yap</h2>
+        
+        <form action="/ajanda-olustur" method="post">
+            
+            <label for="ders_adi">Ders Adı (Örn: Matematik, Fizik, Tarih):</label>
+            <input type="text" id="ders_adi" name="ders_adi" required>
+
+            <label for="tarih">Sınav/Quiz Tarihi:</label>
+            <input type="date" id="tarih" name="tarih" required>
+
+            <label for="konular">Konular (Virgülle Ayırarak):</label>
+            <textarea id="konular" name="konular" rows="4" required></textarea>
+
+            <button type="submit">Ajanda Oluştur</button>
+        </form>
+
+        <hr> 
+
+        <h2>Gelecek Sınav ve Quizler</h2>
+
+        {% if ajanda_listesi %} 
+            <table>
+                <thead>
+                    <tr>
+                        <th>Ders Adı</th>
+                        <th>Sınav Tarihi</th>
+                        <th>Kalan Gün</th>
+                        <th>Çalışma Etiketi</th>
+                        <th>Konular</th>
+                        <th>Video Önerileri</th>
+                        <th>İşlemler</th> </tr>
+                </thead>
+                <tbody>
+                    {% for ajanda in ajanda_listesi %}
+                    <tr>
+                        <td>{{ ajanda.kayit.ders_adi }}</td>
+                        <td>{{ ajanda.kayit.tarih.strftime('%d-%m-%Y') }}</td>
+                        <td>
+                            {% if ajanda.kalan_gun >= 0 %}
+                                {{ ajanda.kalan_gun }} gün
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ ajanda.plan_etiketi }}</td>
+                        <td>{{ ajanda.kayit.konular }}</td>
+
+                        <td>
+                            {% if ajanda.video_listesi %}
+                                {% for video in ajanda.video_listesi %}
+                                    <a href="https://www.youtube.com/watch?v={{ video.video_id }}" target="_blank">
+                                        🔗 {{ video.title | truncate(40) }}
+                                    </a><br>
+                                {% endfor %}
+                            {% else %}
+                                Video bulunamadı.
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <form action="{{ url_for('kayit_sil', kayit_id=ajanda.kayit.id) }}" method="post">
+                                <button type="submit" class="sil-btn">Sil</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Henüz ajandada hiçbir sınav kaydı yok. Hemen bir tane ekleyin!</p>
+        {% endif %}
+    </main>
+</body>
+</html>
