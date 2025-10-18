@@ -19,17 +19,22 @@ app = Flask(__name__)
 # --- UYGULAMA YAPILANDIRMASI (VERİ TABANI VE GİZLİ ANAHTAR) ---
 
 # Bu tek satır, hem yerelde SQLite'ı hem de Render'da DATABASE_URL'ı (PostgreSQL) kullanır.
-# InterfaceError hatasını çözen son ve doğru ayardır.
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///proje_ajandasi.db') 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'cok_gizli_bir_anahtar') # Flask-Login için zorunlu
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'cok_gizli_bir_anahtar') 
 
 db = SQLAlchemy(app)
+
+# --- TABLOLARI OLUŞTURMA (RENDER İÇİN KRİTİK) ---
+# Bu blok, uygulamanın Gunicorn tarafından her başlatılmasında tabloların varlığını kontrol eder ve eksikse oluşturur.
+# Bu, UndefinedTable ve Status 2 hatalarını çözen en güvenilir yöntemdir.
+with app.app_context():
+    db.create_all()
 
 # --- FLASK-LOGIN YAPILANDIRMASI ---
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'giris' # Giriş yapılmamışsa yönlendirilecek sayfa
+login_manager.login_view = 'giris' 
 login_manager.login_message = "Bu sayfaya erişmek için lütfen giriş yapın."
 
 
@@ -47,7 +52,6 @@ class Kullanici(UserMixin, db.Model):
     kullanici_adi = db.Column(db.String(80), unique=True, nullable=False)
     eposta = db.Column(db.String(120), unique=True, nullable=False)
     parola_hash = db.Column(db.String(128))
-    # Kullanıcının ajanda kayıtları
     kayitlar = db.relationship('Kayit', backref='yazar', lazy=True)
 
     def set_password(self, parola):
@@ -65,16 +69,13 @@ class Kayit(db.Model):
     video_sonuc = db.Column(db.Text)
     eklenme_tarihi = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Kullanıcı ilişkisi: Her kayıt bir kullanıcıya aittir.
     kullanici_id = db.Column(db.Integer, db.ForeignKey('kullanici.id'), nullable=False)
 
 # --- YOUTUBE ARAMA FONKSİYONU ---
 def youtube_arama(arama_sorgusu):
     if not YOUTUBE_API_KEY:
-        # API anahtarı yoksa boş liste döndür
         return []
     try:
-        # API anahtarının doğru olduğundan emin ol
         if not YOUTUBE_API_KEY.strip():
              return []
              
@@ -99,7 +100,6 @@ def youtube_arama(arama_sorgusu):
             
         return video_listesi
     except Exception:
-        # Hata olursa boş liste döndür (API kotası, anahtar hatası vb.)
         return []
 
 # --- ROTALAR (SAYFA ADRESLERİ) ---
@@ -108,7 +108,7 @@ def youtube_arama(arama_sorgusu):
 @app.route('/giris', methods=['GET', 'POST'])
 def giris():
     if current_user.is_authenticated:
-        return redirect(url_for('index')) # Zaten giriş yapılmışsa ana sayfaya yönlendir
+        return redirect(url_for('index'))
         
     if request.method == 'POST':
         eposta = request.form.get('eposta')
@@ -129,20 +129,19 @@ def giris():
 @app.route('/kayitol', methods=['GET', 'POST'])
 def kayitol():
     if current_user.is_authenticated:
-        return redirect(url_for('index')) # Zaten giriş yapılmışsa ana sayfaya yönlendir
+        return redirect(url_for('index'))
         
     if request.method == 'POST':
         kullanici_adi = request.form.get('kullanici_adi')
         eposta = request.form.get('eposta')
         parola = request.form.get('parola')
         
-        # Kullanıcı zaten var mı kontrol et
         if Kullanici.query.filter_by(eposta=eposta).first():
             flash('Bu e-posta adresi zaten kayıtlı.', 'warning')
             return redirect(url_for('kayitol'))
             
         yeni_kullanici = Kullanici(kullanici_adi=kullanici_adi, eposta=eposta)
-        yeni_kullanici.set_password(parola) # Parolayı hash'le
+        yeni_kullanici.set_password(parola)
         
         db.session.add(yeni_kullanici)
         db.session.commit()
@@ -154,7 +153,7 @@ def kayitol():
 
 # Çıkış Rotası
 @app.route('/cikis')
-@login_required # Sadece giriş yapmış kullanıcılar erişebilir
+@login_required 
 def cikis():
     logout_user()
     flash('Başarıyla çıkış yaptınız.', 'info')
@@ -166,7 +165,6 @@ def cikis():
 def index():
     bugun = datetime.now().date() 
     
-    # Sadece giriş yapmış kullanıcının kayıtlarını getir!
     sirali_kayitlar = Kayit.query.filter_by(kullanici_id=current_user.id).order_by(Kayit.tarih).all()
     
     ajanda_verileri = []
@@ -220,13 +218,12 @@ def ajanda_olustur():
         
         tarih_obj = datetime.strptime(tarih_str, '%Y-%m-%d')
         
-        # Veritabanına kayıt işlemi (Kullanıcı ID'si eklendi)
         yeni_kayit = Kayit(
             ders_adi=ders_adi, 
             tarih=tarih_obj, 
             konular=konular,
             video_sonuc=video_json,
-            kullanici_id=current_user.id # KRİTİK! Giriş yapan kullanıcının ID'si
+            kullanici_id=current_user.id 
         )
         
         db.session.add(yeni_kayit)
@@ -242,8 +239,6 @@ def ajanda_olustur():
 @app.route('/sil/<int:kayit_id>', methods=['POST'])
 @login_required 
 def kayit_sil(kayit_id):
-    # Sadece kendi kayıtlarını silmesini sağla
-    # current_user.id ile filtreleme yapıyoruz
     kayit = Kayit.query.filter_by(id=kayit_id, kullanici_id=current_user.id).first_or_404()
     
     db.session.delete(kayit)
@@ -255,11 +250,4 @@ def kayit_sil(kayit_id):
 
 # --- UYGULAMAYI ÇALIŞTIRMA ---
 if __name__ == '__main__':
-    # Sadece yerelde çalışırken çalışır. Render'da Gunicorn çalıştırır.
-    with app.app_context():
-        try:
-             db.create_all()
-        except Exception as e:
-            print(f"Yerel Veritabanı oluşturulurken hata: {e}")
-
     app.run(debug=True)
