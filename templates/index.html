@@ -3,87 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Destekli Öğrenci Ajandası</title>
+    <title>Süper Ajanda - Kişisel Planlama</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* Sadece bu sayfa için stil */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.8em;
+        }
+        .user-info {
+            font-size: 1em;
+        }
+        .btn-logout {
+            background-color: #dc3545;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 5px;
+            text-decoration: none;
+            margin-left: 10px;
+        }
+        .flashes {
+            list-style: none;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .danger { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    </style>
 </head>
 <body>
-    <header>
-        <h1>AI Destekli Öğrenci Ajandası</h1>
-        <p>Gelecek sınavlarına planlı hazırlan!</p>
-    </header>
+    <div class="container">
 
-    <main>
-        <h2>Yeni Sınav/Quiz Girişi Yap</h2>
-        
-        <form action="/ajanda-olustur" method="post">
+        <div class="header">
+            <h1>Süper! İlk Web Uygulaman Çalışıyor!</h1>
             
-            <label for="ders_adi">Ders Adı (Örn: Matematik, Fizik, Tarih):</label>
-            <input type="text" id="ders_adi" name="ders_adi" required>
+            <div class="user-info">
+                {% if current_user.is_authenticated %}
+                    <span>Hoş geldin, **{{ current_user.kullanici_adi }}**!</span>
+                    <a href="{{ url_for('cikis') }}" class="btn-logout">Çıkış Yap</a>
+                {% else %}
+                    <span>Lütfen <a href="{{ url_for('giris') }}">Giriş Yap</a> veya <a href="{{ url_for('kayitol') }}">Kayıt Ol</a>.</span>
+                {% endif %}
+            </div>
+        </div>
 
-            <label for="tarih">Sınav/Quiz Tarihi:</label>
-            <input type="date" id="tarih" name="tarih" required>
-
-            <label for="konular">Konular (Virgülle Ayırarak):</label>
-            <textarea id="konular" name="konular" rows="4" required></textarea>
-
-            <button type="submit">Ajanda Oluştur</button>
-        </form>
-
-        <hr> 
-
-        <h2>Gelecek Sınav ve Quizler</h2>
-
-        {% if ajanda_listesi %} 
-            <table>
-                <thead>
-                    <tr>
-                        <th>Ders Adı</th>
-                        <th>Sınav Tarihi</th>
-                        <th>Kalan Gün</th>
-                        <th>Çalışma Etiketi</th>
-                        <th>Konular</th>
-                        <th>Video Önerileri</th>
-                        <th>İşlemler</th> </tr>
-                </thead>
-                <tbody>
-                    {% for ajanda in ajanda_listesi %}
-                    <tr>
-                        <td>{{ ajanda.kayit.ders_adi }}</td>
-                        <td>{{ ajanda.kayit.tarih.strftime('%d-%m-%Y') }}</td>
-                        <td>
-                            {% if ajanda.kalan_gun >= 0 %}
-                                {{ ajanda.kalan_gun }} gün
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>{{ ajanda.plan_etiketi }}</td>
-                        <td>{{ ajanda.kayit.konular }}</td>
-
-                        <td>
-                            {% if ajanda.video_listesi %}
-                                {% for video in ajanda.video_listesi %}
-                                    <a href="https://www.youtube.com/watch?v={{ video.video_id }}" target="_blank">
-                                        🔗 {{ video.title | truncate(40) }}
-                                    </a><br>
-                                {% endfor %}
-                            {% else %}
-                                Video bulunamadı.
-                            {% endif %}
-                        </td>
-
-                        <td>
-                            <form action="{{ url_for('kayit_sil', kayit_id=ajanda.kayit.id) }}" method="post">
-                                <button type="submit" class="sil-btn">Sil</button>
-                            </form>
-                        </td>
-                    </tr>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flashes">
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
                     {% endfor %}
-                </tbody>
-            </table>
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        
+        {% if current_user.is_authenticated %}
+            <h2>Yeni Sınav/Quiz Girişi Yap</h2>
+            <form action="{{ url_for('ajanda_olustur') }}" method="POST" class="ajanda-form">
+                <label for="ders_adi">Ders Adı (Örn: Matematik, Fizik, Tarih):</label>
+                <input type="text" id="ders_adi" name="ders_adi" required>
+
+                <label for="tarih">Sınav/Quiz Tarihi:</label>
+                <input type="date" id="tarih" name="tarih" required>
+
+                <label for="konular">Konular (Virgülle Ayırarak):</label>
+                <textarea id="konular" name="konular" rows="4" required></textarea>
+
+                <button type="submit" class="btn-submit">Ajanda Oluştur</button>
+            </form>
+
+            <hr>
+            <h2>Gelecek Sınav ve Quizler (Sadece Senin Kayıtların)</h2>
+            
+            <div class="ajanda-listesi">
+                {% for item in ajanda_listesi %}
+                <div class="ajanda-item {{ item.plan_etiketi|lower|replace(' ', '-') }}">
+                    <div class="ajanda-header">
+                        <span class="ders-adi">{{ item.kayit.ders_adi }}</span>
+                        <span class="tarih">Sınav Tarihi: {{ item.kayit.tarih.strftime('%d-%m-%Y') }}</span>
+                    </div>
+                    
+                    <p class="etiket {{ item.plan_etiketi|lower|replace(' ', '-') }}">
+                        {{ item.plan_etiketi }} ({{ item.kalan_gun }} gün kaldı)
+                    </p>
+
+                    <p class="konular">
+                        **Konular:** {{ item.kayit.konular }}
+                    </p>
+                    
+                    {% if item.video_listesi %}
+                        <div class="video-önerileri">
+                            <h4>Önerilen Video Kaynakları:</h4>
+                            <ul>
+                                {% for video in item.video_listesi %}
+                                    <li>
+                                        <a href="https://www.youtube.com/watch?v={{ video.video_id }}" target="_blank">
+                                            {{ video.title }}
+                                        </a>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
+                    <form action="{{ url_for('kayit_sil', kayit_id=item.kayit.id) }}" method="POST" onsubmit="return confirm('Bu kaydı silmek istediğinize emin misiniz?');">
+                        <button type="submit" class="btn-sil">Kaydı Sil</button>
+                    </form>
+                </div>
+                {% empty %}
+                    <p>Henüz ajandanızda bir kayıt yok. Hemen yukarıdan ekleyin!</p>
+                {% endfor %}
+            </div>
         {% else %}
-            <p>Henüz ajandada hiçbir sınav kaydı yok. Hemen bir tane ekleyin!</p>
+            <p style="text-align: center; margin-top: 50px; font-size: 1.2em;">
+                Ajandanızı görmek için lütfen giriş yapın.
+            </p>
         {% endif %}
-    </main>
+    </div>
 </body>
 </html>
