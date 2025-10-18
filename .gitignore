@@ -1,0 +1,9 @@
+# Sanal Ortam (venv)
+venv/
+*.pyc
+
+# Gizli Veriler
+.env
+
+# Veritabanı
+*.db
