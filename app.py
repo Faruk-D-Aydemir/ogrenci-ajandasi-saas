@@ -18,9 +18,8 @@ app = Flask(__name__)
 
 # --- UYGULAMA YAPILANDIRMASI (VERİ TABANI VE GİZLİ ANAHTAR) ---
 
-# PostgreSQL veri tabanı bağlantısı için çevre değişkeni
-# NOT: Render'daki InterfaceError hatasını çözmek için, 
-# otomatik düzeltme kodunu kaldırdık ve Render'ın DATABASE_URL'ına güvendik.
+# Bu tek satır, hem yerelde SQLite'ı hem de Render'da DATABASE_URL'ı (PostgreSQL) kullanır.
+# InterfaceError hatasını çözen son ve doğru ayardır.
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///proje_ajandasi.db') 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'cok_gizli_bir_anahtar') # Flask-Login için zorunlu
@@ -256,13 +255,11 @@ def kayit_sil(kayit_id):
 
 # --- UYGULAMAYI ÇALIŞTIRMA ---
 if __name__ == '__main__':
-    # Veritabanı tablolarını oluştur
+    # Sadece yerelde çalışırken çalışır. Render'da Gunicorn çalıştırır.
     with app.app_context():
         try:
              db.create_all()
         except Exception as e:
-            # OperationalError veya diğer hatalar için yerel konsola uyarı bırakır.
             print(f"Yerel Veritabanı oluşturulurken hata: {e}")
-            print("Render'da bu hatayı alırsanız, 'flask shell'e girip 'db.create_all()' komutunu çalıştırın.")
 
     app.run(debug=True)
