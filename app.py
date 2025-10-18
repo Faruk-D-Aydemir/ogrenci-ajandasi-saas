@@ -19,7 +19,8 @@ app = Flask(__name__)
 # --- UYGULAMA YAPILANDIRMASI (VERİ TABANI VE GİZLİ ANAHTAR) ---
 
 # PostgreSQL veri tabanı bağlantısı için çevre değişkeni
-# NOT: Yerelde SQLite kullanır.
+# NOT: Render'daki InterfaceError hatasını çözmek için, 
+# otomatik düzeltme kodunu kaldırdık ve Render'ın DATABASE_URL'ına güvendik.
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///proje_ajandasi.db') 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'cok_gizli_bir_anahtar') # Flask-Login için zorunlu
@@ -36,9 +37,6 @@ login_manager.login_message = "Bu sayfaya erişmek için lütfen giriş yapın."
 # Kullanıcı oturumunu yöneten fonksiyon
 @login_manager.user_loader
 def load_user(user_id):
-    # Bu satırdaki db.session.get kullanımı daha modern ve doğru olabilir.
-    # Ancak eski Flask-SQLAlchemy versiyonlarında query.get kullanılır. 
-    # Seninkinde çalışması için query.get kullanıyoruz:
     return Kullanici.query.get(int(user_id))
 
 
@@ -74,8 +72,13 @@ class Kayit(db.Model):
 # --- YOUTUBE ARAMA FONKSİYONU ---
 def youtube_arama(arama_sorgusu):
     if not YOUTUBE_API_KEY:
+        # API anahtarı yoksa boş liste döndür
         return []
     try:
+        # API anahtarının doğru olduğundan emin ol
+        if not YOUTUBE_API_KEY.strip():
+             return []
+             
         youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
         
         request = youtube.search().list(
@@ -97,6 +100,7 @@ def youtube_arama(arama_sorgusu):
             
         return video_listesi
     except Exception:
+        # Hata olursa boş liste döndür (API kotası, anahtar hatası vb.)
         return []
 
 # --- ROTALAR (SAYFA ADRESLERİ) ---
@@ -254,13 +258,11 @@ def kayit_sil(kayit_id):
 if __name__ == '__main__':
     # Veritabanı tablolarını oluştur
     with app.app_context():
-        # db.create_all() hata veriyorsa, terminalde Flask kabuğunu kullanmalıyız.
-        # Yerelde çalıştırmak için bu satırı deniyoruz.
         try:
              db.create_all()
         except Exception as e:
-            # OperationalError verirse, genellikle dosya kilidi/izin sorunudur.
-            print(f"Veritabanı oluşturulurken hata: {e}")
-            print("Lütfen VS Code terminalinde 'flask shell'e girip 'db.create_all()' komutunu çalıştırın.")
+            # OperationalError veya diğer hatalar için yerel konsola uyarı bırakır.
+            print(f"Yerel Veritabanı oluşturulurken hata: {e}")
+            print("Render'da bu hatayı alırsanız, 'flask shell'e girip 'db.create_all()' komutunu çalıştırın.")
 
     app.run(debug=True)
