@@ -1,1 +1,1 @@
-web: gunicorn app:app
+web: gunicorn --max-requests 1 --max-requests-jitter 1 app:app
