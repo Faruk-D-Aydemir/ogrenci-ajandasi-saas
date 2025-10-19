@@ -1,8 +1,8 @@
 Flask
 Flask-SQLAlchemy
 Flask-Login
-psycopg2-binary
 gunicorn
 python-dotenv
 google-api-python-client
 werkzeug
+psycopg2-binary
