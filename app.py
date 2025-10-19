@@ -1,5 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
+# Flask-Login modülleri
 from flask_login import UserMixin, login_user, LoginManager, login_required, logout_user, current_user
+# SQLAlchemy ve Veritabanı için gerekli modüller (psycopg2'yi kullanacağız)
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from dotenv import load_dotenv 
@@ -7,6 +9,9 @@ import os
 from googleapiclient.discovery import build
 import json
 from werkzeug.security import generate_password_hash, check_password_hash
+# Geçici Dizin için gerekli modül (Internal Server Error çözümü için KRİTİK)
+import tempfile 
+
 
 # --- ÇEVRE DEĞİŞKENLERİNİ YÜKLEME (.env) ---
 load_dotenv() 
@@ -21,10 +26,14 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///pro
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'cok_gizli_bir_anahtar') 
 
+# >>>>>> EK GÜVENLİK/HATA ÇÖZÜMÜ: OTURUM DOSYALARINI GEÇİCİ DİZİNDE SAKLA <<<<<<
+# Render'da giriş/kayıt yaparken oluşan Internal Server Error'ü çözer.
+app.config['SESSION_FILE_DIR'] = tempfile.gettempdir()
+# >>>>>> ÇÖZÜM KODUNUN SONU <<<<<<
+
 db = SQLAlchemy(app)
 
 # --- TABLOLARI OLUŞTURMA (RENDER İÇİN KRİTİK YERLEŞİM) ---
-# Bu blok, uygulamanın Gunicorn tarafından her başlatılmasında tabloların varlığını kontrol eder.
 with app.app_context():
     db.create_all()
 
@@ -34,11 +43,16 @@ login_manager.init_app(app)
 login_manager.login_view = 'giris' 
 login_manager.login_message = "Bu sayfaya erişmek için lütfen giriş yapın."
 
+
+# Kullanıcı oturumunu yöneten fonksiyon
 @login_manager.user_loader
 def load_user(user_id):
     return Kullanici.query.get(int(user_id))
 
-# --- VERİ TABANI MODELLERİ ---
+
+# --- VERİ TABANI MODELLERİ (SQLAlchemy) ---
+
+# Kullanıcı Modeli (Flask-Login için UserMixin'den miras alır)
 class Kullanici(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     kullanici_adi = db.Column(db.String(80), unique=True, nullable=False)
@@ -52,6 +66,7 @@ class Kullanici(UserMixin, db.Model):
     def check_password(self, parola):
         return check_password_hash(self.parola_hash, parola)
 
+# Ajanda Kayıt Modeli
 class Kayit(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ders_adi = db.Column(db.String(100), nullable=False)
@@ -59,6 +74,7 @@ class Kayit(db.Model):
     konular = db.Column(db.Text, nullable=False)
     video_sonuc = db.Column(db.Text)
     eklenme_tarihi = db.Column(db.DateTime, default=datetime.utcnow)
+    
     kullanici_id = db.Column(db.Integer, db.ForeignKey('kullanici.id'), nullable=False)
 
 # --- YOUTUBE ARAMA FONKSİYONU ---
@@ -68,8 +84,17 @@ def youtube_arama(arama_sorgusu):
     try:
         if not YOUTUBE_API_KEY.strip():
              return []
+             
         youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
-        request = youtube.search().list(q=arama_sorgusu, part="snippet", maxResults=3, type="video", videoEmbeddable="true")
+        
+        request = youtube.search().list(
+            q=arama_sorgusu,             
+            part="snippet",              
+            maxResults=3,                
+            type="video",                
+            videoEmbeddable="true"       
+        )
+        
         response = request.execute()
         
         video_listesi = []
@@ -78,46 +103,61 @@ def youtube_arama(arama_sorgusu):
                 'title': item['snippet']['title'],
                 'video_id': item['id']['videoId']
             })
+            
         return video_listesi
     except Exception:
         return []
 
 # --- ROTALAR (SAYFA ADRESLERİ) ---
+
+# Giriş Sayfası
 @app.route('/giris', methods=['GET', 'POST'])
 def giris():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
+        
     if request.method == 'POST':
         eposta = request.form.get('eposta')
         parola = request.form.get('parola')
+        
         kullanici = Kullanici.query.filter_by(eposta=eposta).first()
+        
         if kullanici and kullanici.check_password(parola):
             login_user(kullanici)
             flash('Başarıyla giriş yaptınız!', 'success')
             return redirect(url_for('index'))
         else:
             flash('Giriş başarısız. Lütfen e-posta ve şifrenizi kontrol edin.', 'danger')
+            
     return render_template('giris.html') 
 
+# Kayıt Ol Sayfası
 @app.route('/kayitol', methods=['GET', 'POST'])
 def kayitol():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
+        
     if request.method == 'POST':
         kullanici_adi = request.form.get('kullanici_adi')
         eposta = request.form.get('eposta')
         parola = request.form.get('parola')
+        
         if Kullanici.query.filter_by(eposta=eposta).first():
             flash('Bu e-posta adresi zaten kayıtlı.', 'warning')
             return redirect(url_for('kayitol'))
+            
         yeni_kullanici = Kullanici(kullanici_adi=kullanici_adi, eposta=eposta)
         yeni_kullanici.set_password(parola)
+        
         db.session.add(yeni_kullanici)
         db.session.commit()
+        
         flash('Hesabınız başarıyla oluşturuldu! Lütfen giriş yapın.', 'success')
         return redirect(url_for('giris'))
+        
     return render_template('kayitol.html') 
 
+# Çıkış Rotası
 @app.route('/cikis')
 @login_required 
 def cikis():
@@ -125,11 +165,14 @@ def cikis():
     flash('Başarıyla çıkış yaptınız.', 'info')
     return redirect(url_for('giris'))
 
+# Ana Sayfa (Sadece Giriş Yapmış Kullanıcılar Erişebilir)
 @app.route('/')
 @login_required 
 def index():
     bugun = datetime.now().date() 
+    
     sirali_kayitlar = Kayit.query.filter_by(kullanici_id=current_user.id).order_by(Kayit.tarih).all()
+    
     ajanda_verileri = []
     
     for kayit in sirali_kayitlar:
@@ -137,6 +180,7 @@ def index():
         kalan_gun = (tarih_obj - bugun).days
         plan_etiketi = ""
 
+        # Basit AI Planlama Mantığı
         if kalan_gun < 0:
             plan_etiketi = "Sınav Günü Geçti 😥"
         elif kalan_gun <= 3:
@@ -162,10 +206,13 @@ def index():
     
     return render_template('index.html', ajanda_listesi=ajanda_verileri)
 
+
+# Form verilerinin işleneceği yer (Kullanıcı ID'si eklendi)
 @app.route('/ajanda-olustur', methods=['POST'])
 @login_required 
 def ajanda_olustur():
     if request.method == 'POST':
+        
         ders_adi = request.form.get('ders_adi')
         tarih_str = request.form.get('tarih')
         konular = request.form.get('konular')
@@ -174,6 +221,7 @@ def ajanda_olustur():
         video_sonuclari = youtube_arama(arama_sorgusu)
 
         video_json = json.dumps(video_sonuclari)
+        
         tarih_obj = datetime.strptime(tarih_str, '%Y-%m-%d')
         
         yeni_kayit = Kayit(
@@ -181,7 +229,7 @@ def ajanda_olustur():
             tarih=tarih_obj, 
             konular=konular,
             video_sonuc=video_json,
-            kullanici_id=current_user.id
+            kullanici_id=current_user.id 
         )
         
         db.session.add(yeni_kayit)
@@ -189,16 +237,22 @@ def ajanda_olustur():
         
         flash('Yeni ajanda kaydı başarıyla oluşturuldu!', 'success')
         return redirect(url_for('index'))
+    
     return "Hata: Yanlış istek metodu."
 
+
+# --- KAYIT SİLME (Veri Tabanından Silme) ---
 @app.route('/sil/<int:kayit_id>', methods=['POST'])
 @login_required 
 def kayit_sil(kayit_id):
     kayit = Kayit.query.filter_by(id=kayit_id, kullanici_id=current_user.id).first_or_404()
+    
     db.session.delete(kayit)
     db.session.commit()
+    
     flash('Ajanda kaydı başarıyla silindi.', 'info')
     return redirect(url_for('index'))
+
 
 # --- UYGULAMAYI ÇALIŞTIRMA ---
 if __name__ == '__main__':
