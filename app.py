@@ -9,7 +9,7 @@ import json
 from werkzeug.security import generate_password_hash, check_password_hash
 import tempfile 
 from flask_session import Session 
-
+# >>>>>>> psycop2 sürücüsü (psycopg2-binary) requirements.txt'de var, bu yüzden burada import etmeye gerek yok.
 
 # --- ÇEVRE DEĞİŞKENLERİNİ YÜKLEME (.env) ---
 load_dotenv() 
@@ -18,11 +18,14 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 app = Flask(__name__)
 
 # --- UYGULAMA YAPILANDIRMASI (VERİ TABANI VE GİZLİ ANAHTAR) ---
+
+# RENDER ORTAMINDA DATABASE_URL DEĞİŞKENİNİ KULLAN. HATA ÇÖZÜMÜ İÇİN SQLITE YEDEĞİ VAR.
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///proje_ajandasi.db') 
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'cok_gizli_bir_anahtar') 
 
-# >>>>>> KESİN ÇÖZÜM: FLASK-SESSION AYARLARI <<<<<<
+# >>>>>> KESİN ÇÖZÜM: FLASK-SESSION AYARLARI (Gereklidir) <<<<<<
 app.config['SESSION_TYPE'] = 'filesystem' 
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_FILE_DIR'] = tempfile.gettempdir()
@@ -31,7 +34,7 @@ Session(app)
 
 db = SQLAlchemy(app)
 
-# --- TABLOLARI OLUŞTURMA (RENDER İÇİN KRİTİK YERLEŞİM) ---
+# --- TABLOLARI OLUŞTURMA (RENDER İÇİN KRİTİK YERLEŞİM: db.create_all() doğru yerde) ---
 with app.app_context():
     db.create_all()
 
@@ -71,12 +74,9 @@ class Kayit(db.Model):
 
 # --- YOUTUBE ARAMA FONKSİYONU ---
 def youtube_arama(arama_sorgusu):
-    if not YOUTUBE_API_KEY:
+    if not YOUTUBE_API_KEY or not YOUTUBE_API_KEY.strip():
         return []
     try:
-        if not YOUTUBE_API_KEY.strip():
-             return []
-             
         youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
         
         request = youtube.search().list(
@@ -98,6 +98,7 @@ def youtube_arama(arama_sorgusu):
             
         return video_listesi
     except Exception:
+        # API hatası veya geçersiz anahtar durumunda boş liste döner
         return []
 
 # --- ROTALAR (SAYFA ADRESLERİ) ---
@@ -110,7 +111,12 @@ def giris():
         eposta = request.form.get('eposta')
         parola = request.form.get('parola')
         
-        kullanici = Kullanici.query.filter_by(eposta=eposta).first()
+        # Kullanıcıyı veritabanından sorgula
+        try:
+            kullanici = Kullanici.query.filter_by(eposta=eposta).first()
+        except Exception as e:
+            flash(f'Veritabanı hatası: {e}', 'danger')
+            return render_template('giris.html') # Hata durumunda sayfayı tekrar yükle
         
         if kullanici and kullanici.check_password(parola):
             login_user(kullanici)
@@ -131,15 +137,21 @@ def kayitol():
         eposta = request.form.get('eposta')
         parola = request.form.get('parola')
         
-        if Kullanici.query.filter_by(eposta=eposta).first():
-            flash('Bu e-posta adresi zaten kayıtlı.', 'warning')
-            return redirect(url_for('kayitol'))
+        # Veritabanı sorgusunu try-except içine al
+        try:
+            if Kullanici.query.filter_by(eposta=eposta).first():
+                flash('Bu e-posta adresi zaten kayıtlı.', 'warning')
+                return redirect(url_for('kayitol'))
+                
+            yeni_kullanici = Kullanici(kullanici_adi=kullanici_adi, eposta=eposta)
+            yeni_kullanici.set_password(parola)
             
-        yeni_kullanici = Kullanici(kullanici_adi=kullanici_adi, eposta=eposta)
-        yeni_kullanici.set_password(parola)
-        
-        db.session.add(yeni_kullanici)
-        db.session.commit()
+            db.session.add(yeni_kullanici)
+            db.session.commit()
+        except Exception as e:
+            # Hata durumunda kullanıcıyı bilgilendir
+            flash(f'Kayıt işlemi sırasında veritabanı hatası oluştu: {e}', 'danger')
+            return redirect(url_for('kayitol'))
         
         flash('Hesabınız başarıyla oluşturuldu! Lütfen giriş yapın.', 'success')
         return redirect(url_for('giris'))
@@ -158,8 +170,13 @@ def cikis():
 def index():
     bugun = datetime.now().date() 
     
-    sirali_kayitlar = Kayit.query.filter_by(kullanici_id=current_user.id).order_by(Kayit.tarih).all()
-    
+    try:
+        # Kullanıcıya ait tüm kayıtları sorgula
+        sirali_kayitlar = Kayit.query.filter_by(kullanici_id=current_user.id).order_by(Kayit.tarih).all()
+    except Exception as e:
+        flash(f'Ajanda verileri çekilirken hata oluştu: {e}', 'danger')
+        sirali_kayitlar = []
+
     ajanda_verileri = []
     
     for kayit in sirali_kayitlar:
@@ -201,25 +218,29 @@ def ajanda_olustur():
         tarih_str = request.form.get('tarih')
         konular = request.form.get('konular')
         
+        # YouTube Arama
         arama_sorgusu = f"{ders_adi} {konular.split(',')[0].strip()} konu anlatımı"
         video_sonuclari = youtube_arama(arama_sorgusu)
-
         video_json = json.dumps(video_sonuclari)
         
-        tarih_obj = datetime.strptime(tarih_str, '%Y-%m-%d')
-        
-        yeni_kayit = Kayit(
-            ders_adi=ders_adi, 
-            tarih=tarih_obj, 
-            konular=konular,
-            video_sonuc=video_json,
-            kullanici_id=current_user.id 
-        )
-        
-        db.session.add(yeni_kayit)
-        db.session.commit()
-        
-        flash('Yeni ajanda kaydı başarıyla oluşturuldu!', 'success')
+        try:
+            tarih_obj = datetime.strptime(tarih_str, '%Y-%m-%d')
+            
+            yeni_kayit = Kayit(
+                ders_adi=ders_adi, 
+                tarih=tarih_obj, 
+                konular=konular,
+                video_sonuc=video_json,
+                kullanici_id=current_user.id 
+            )
+            
+            db.session.add(yeni_kayit)
+            db.session.commit()
+            
+            flash('Yeni ajanda kaydı başarıyla oluşturuldu!', 'success')
+        except Exception as e:
+            flash(f'Kayıt oluşturulurken bir hata oluştu: {e}', 'danger')
+            
         return redirect(url_for('index'))
     
     return "Hata: Yanlış istek metodu."
@@ -227,12 +248,16 @@ def ajanda_olustur():
 @app.route('/sil/<int:kayit_id>', methods=['POST'])
 @login_required 
 def kayit_sil(kayit_id):
-    kayit = Kayit.query.filter_by(id=kayit_id, kullanici_id=current_user.id).first_or_404()
-    
-    db.session.delete(kayit)
-    db.session.commit()
-    
-    flash('Ajanda kaydı başarıyla silindi.', 'info')
+    try:
+        kayit = Kayit.query.filter_by(id=kayit_id, kullanici_id=current_user.id).first_or_404()
+        
+        db.session.delete(kayit)
+        db.session.commit()
+        
+        flash('Ajanda kaydı başarıyla silindi.', 'info')
+    except Exception as e:
+        flash(f'Silme işlemi sırasında hata oluştu: {e}', 'danger')
+        
     return redirect(url_for('index'))
 
 
