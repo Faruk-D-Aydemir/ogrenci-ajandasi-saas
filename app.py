@@ -253,6 +253,18 @@ def kayit_sil(kayit_id):
     flash('Ajanda kaydı başarıyla silindi.', 'info')
     return redirect(url_for('index'))
 
+# ... (Kayit sil rotasından sonra)
+
+# >>>>>> RENDER HEALTH CHECK ROTASI EKLE <<<<<<
+@app.route('/health')
+def health_check():
+    # Render'a uygulama calisiyor mesajini gonderir
+    return "OK", 200
+# >>>>>> ROTA SONU <<<<<<
+
+# --- UYGULAMAYI ÇALIŞTIRMA ---
+if __name__ == '__main__':
+    app.run(debug=True)
 
 # --- UYGULAMAYI ÇALIŞTIRMA ---
 if __name__ == '__main__':
