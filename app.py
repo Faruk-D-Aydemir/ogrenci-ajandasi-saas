@@ -18,7 +18,6 @@ app = Flask(__name__)
 
 # --- UYGULAMA YAPILANDIRMASI (VERİ TABANI VE GİZLİ ANAHTAR) ---
 # DATABASE_URL'i kullan. sqlite yedeği, geliştirme için kalabilir.
-# postgresql+psycopg2 sürücüsü için uyumlu formatı kullanacağız.
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///proje_ajandasi.db') 
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -33,7 +32,9 @@ Session(app)
 
 db = SQLAlchemy(app)
 
-# Tablo oluşturma komutu (db.create_all()), Build Command'a taşındığı için buradan kaldırıldı.
+# --- TABLOLARI OLUŞTURMA (Gunicorn ile başlatıldığında otomatik çalışacak) ---
+with app.app_context():
+    db.create_all()
 
 # --- FLASK-LOGIN YAPILANDIRMASI ---
 login_manager = LoginManager()
@@ -47,7 +48,7 @@ def load_user(user_id):
 
 # --- VERİ TABANI MODELLERİ (SQLAlchemy) ---
 class Kullanici(UserMixin, db.Model):
-    # PostgreSQL uyumu için tablo adını küçük harf yap (KESİN ÇÖZÜM)
+    # PostgreSQL uyumu için tablo adını küçük harf yap
     __tablename__ = 'kullanici' 
     id = db.Column(db.Integer, primary_key=True)
     kullanici_adi = db.Column(db.String(80), unique=True, nullable=False)
@@ -62,7 +63,7 @@ class Kullanici(UserMixin, db.Model):
         return check_password_hash(self.parola_hash, parola)
 
 class Kayit(db.Model):
-    # PostgreSQL uyumu için tablo adını küçük harf yap (KESİN ÇÖZÜM)
+    # PostgreSQL uyumu için tablo adını küçük harf yap
     __tablename__ = 'kayit'
     id = db.Column(db.Integer, primary_key=True)
     ders_adi = db.Column(db.String(100), nullable=False)
