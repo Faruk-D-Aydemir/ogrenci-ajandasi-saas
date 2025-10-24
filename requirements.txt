@@ -6,3 +6,4 @@ python-dotenv
 google-api-python-client
 werkzeug
 psycopg2-binary
+Flask-Session
