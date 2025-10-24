@@ -3,37 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kayıt Ol</title>
+    <title>Kayıt Ol - Öğrenci Ajandası</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Kayıt Ol</h1>
+        <h1>Yeni Hesap Oluştur</h1>
         
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                <ul class="flashes">
-                    {% for category, message in messages %}
-                        <li class="{{ category }}">{{ message }}</li>
-                    {% endfor %}
-                </ul>
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">{{ message }}</div>
+                {% endfor %}
             {% endif %}
         {% endwith %}
 
-        <form method="POST">
-            <label for="kullanici_adi">Kullanıcı Adı:</label>
-            <input type="text" id="kullanici_adi" name="kullanici_adi" required>
-            
-            <label for="eposta">E-posta:</label>
-            <input type="email" id="eposta" name="eposta" required>
-
-            <label for="parola">Parola:</label>
-            <input type="password" id="parola" name="parola" required>
-
-            <button type="submit" class="btn-submit">Hesap Oluştur</button>
+        <form method="POST" action="{{ url_for('kayitol') }}">
+            <input type="text" name="kullanici_adi" placeholder="Kullanıcı Adınız" required>
+            <input type="email" name="eposta" placeholder="E-posta Adresiniz" required>
+            <input type="password" name="parola" placeholder="Şifreniz (min. 6 karakter)" required>
+            <button type="submit">Kayıt Ol</button>
         </form>
-        
-        <p>Zaten hesabınız var mı? <a href="{{ url_for('giris') }}">Giriş Yapın.</a></p>
+
+        <p style="text-align: center; margin-top: 20px;">
+            Zaten hesabınız var mı? <a href="{{ url_for('giris') }}">Giriş Yapın</a>
+        </p>
     </div>
 </body>
 </html>

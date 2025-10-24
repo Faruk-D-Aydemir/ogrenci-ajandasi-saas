@@ -1,7 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
-# Flask-Login modülleri
 from flask_login import UserMixin, login_user, LoginManager, login_required, logout_user, current_user
-# SQLAlchemy ve Veritabanı için gerekli modüller (psycopg2'yi kullanacağız)
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from dotenv import load_dotenv 
@@ -9,8 +7,8 @@ import os
 from googleapiclient.discovery import build
 import json
 from werkzeug.security import generate_password_hash, check_password_hash
-# Geçici Dizin için gerekli modül (Internal Server Error çözümü için KRİTİK)
 import tempfile 
+from flask_session import Session 
 
 
 # --- ÇEVRE DEĞİŞKENLERİNİ YÜKLEME (.env) ---
@@ -20,15 +18,15 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 app = Flask(__name__)
 
 # --- UYGULAMA YAPILANDIRMASI (VERİ TABANI VE GİZLİ ANAHTAR) ---
-
-# Bu tek satır, hem yerelde SQLite'ı hem de Render'da DATABASE_URL'ı (PostgreSQL) kullanır.
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///proje_ajandasi.db') 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'cok_gizli_bir_anahtar') 
 
-# >>>>>> EK GÜVENLİK/HATA ÇÖZÜMÜ: OTURUM DOSYALARINI GEÇİCİ DİZİNDE SAKLA <<<<<<
-# Render'da giriş/kayıt yaparken oluşan Internal Server Error'ü çözer.
+# >>>>>> KESİN ÇÖZÜM: FLASK-SESSION AYARLARI <<<<<<
+app.config['SESSION_TYPE'] = 'filesystem' 
+app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_FILE_DIR'] = tempfile.gettempdir()
+Session(app)
 # >>>>>> ÇÖZÜM KODUNUN SONU <<<<<<
 
 db = SQLAlchemy(app)
@@ -43,16 +41,11 @@ login_manager.init_app(app)
 login_manager.login_view = 'giris' 
 login_manager.login_message = "Bu sayfaya erişmek için lütfen giriş yapın."
 
-
-# Kullanıcı oturumunu yöneten fonksiyon
 @login_manager.user_loader
 def load_user(user_id):
     return Kullanici.query.get(int(user_id))
 
-
 # --- VERİ TABANI MODELLERİ (SQLAlchemy) ---
-
-# Kullanıcı Modeli (Flask-Login için UserMixin'den miras alır)
 class Kullanici(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     kullanici_adi = db.Column(db.String(80), unique=True, nullable=False)
@@ -66,7 +59,6 @@ class Kullanici(UserMixin, db.Model):
     def check_password(self, parola):
         return check_password_hash(self.parola_hash, parola)
 
-# Ajanda Kayıt Modeli
 class Kayit(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ders_adi = db.Column(db.String(100), nullable=False)
@@ -109,8 +101,6 @@ def youtube_arama(arama_sorgusu):
         return []
 
 # --- ROTALAR (SAYFA ADRESLERİ) ---
-
-# Giriş Sayfası
 @app.route('/giris', methods=['GET', 'POST'])
 def giris():
     if current_user.is_authenticated:
@@ -131,7 +121,6 @@ def giris():
             
     return render_template('giris.html') 
 
-# Kayıt Ol Sayfası
 @app.route('/kayitol', methods=['GET', 'POST'])
 def kayitol():
     if current_user.is_authenticated:
@@ -157,7 +146,6 @@ def kayitol():
         
     return render_template('kayitol.html') 
 
-# Çıkış Rotası
 @app.route('/cikis')
 @login_required 
 def cikis():
@@ -165,7 +153,6 @@ def cikis():
     flash('Başarıyla çıkış yaptınız.', 'info')
     return redirect(url_for('giris'))
 
-# Ana Sayfa (Sadece Giriş Yapmış Kullanıcılar Erişebilir)
 @app.route('/')
 @login_required 
 def index():
@@ -180,7 +167,6 @@ def index():
         kalan_gun = (tarih_obj - bugun).days
         plan_etiketi = ""
 
-        # Basit AI Planlama Mantığı
         if kalan_gun < 0:
             plan_etiketi = "Sınav Günü Geçti 😥"
         elif kalan_gun <= 3:
@@ -206,8 +192,6 @@ def index():
     
     return render_template('index.html', ajanda_listesi=ajanda_verileri)
 
-
-# Form verilerinin işleneceği yer (Kullanıcı ID'si eklendi)
 @app.route('/ajanda-olustur', methods=['POST'])
 @login_required 
 def ajanda_olustur():
@@ -240,8 +224,6 @@ def ajanda_olustur():
     
     return "Hata: Yanlış istek metodu."
 
-
-# --- KAYIT SİLME (Veri Tabanından Silme) ---
 @app.route('/sil/<int:kayit_id>', methods=['POST'])
 @login_required 
 def kayit_sil(kayit_id):
@@ -253,19 +235,8 @@ def kayit_sil(kayit_id):
     flash('Ajanda kaydı başarıyla silindi.', 'info')
     return redirect(url_for('index'))
 
-# ... (Kayit sil rotasından sonra)
-
-# >>>>>> RENDER HEALTH CHECK ROTASI EKLE <<<<<<
-@app.route('/health')
-def health_check():
-    # Render'a uygulama calisiyor mesajini gonderir
-    return "OK", 200
-# >>>>>> ROTA SONU <<<<<<
 
 # --- UYGULAMAYI ÇALIŞTIRMA ---
 if __name__ == '__main__':
-    app.run(debug=True)
-
-# --- UYGULAMAYI ÇALIŞTIRMA ---
-if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
