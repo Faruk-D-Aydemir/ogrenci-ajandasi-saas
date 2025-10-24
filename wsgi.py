@@ -1,6 +1,7 @@
 from app import app, db 
 
-# Uygulama bağlamı içinde veritabanı tablolarını oluştur
+# Uygulama bağlamı içinde veritabanı tablolarını oluşturma işlemini zorla
+# Bu, UndefinedTable hatasını çözmek için yapılmıştır.
 with app.app_context():
     db.create_all()
 
