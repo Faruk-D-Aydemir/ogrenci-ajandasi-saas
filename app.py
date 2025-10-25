@@ -17,8 +17,19 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 app = Flask(__name__)
 
 # --- UYGULAMA YAPILANDIRMASI (VERİ TABANI VE GİZLİ ANAHTAR) ---
-# DATABASE_URL'i kullan. sqlite yedeği, geliştirme için kalabilir.
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///proje_ajandasi.db') 
+
+# Render'da postgresql+psycopg2 yerine sadece postgresql sürücüsü denenecek.
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+
+# Render'ın verdiği URL'deki "postgres" kelimesini "postgresql" olarak düzeltir.
+# Bu, Render ortamında oluşan ve bağlantı hatasına neden olan bir durumdur.
+if app.config['SQLALCHEMY_DATABASE_URI'] and app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
+    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace("postgres://", "postgresql://", 1)
+
+# Eğer DATABASE_URL tanımlı değilse (yerelde çalışırken) sqlite kullan.
+if not app.config['SQLALCHEMY_DATABASE_URI']:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///proje_ajandasi.db'
+
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'cok_gizli_bir_anahtar') 
@@ -33,6 +44,7 @@ Session(app)
 db = SQLAlchemy(app)
 
 # --- TABLOLARI OLUŞTURMA (Gunicorn ile başlatıldığında otomatik çalışacak) ---
+# Bu komutun çalışıp çalışmadığını son kez deniyoruz.
 with app.app_context():
     db.create_all()
 
