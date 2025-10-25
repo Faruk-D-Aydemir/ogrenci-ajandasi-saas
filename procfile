@@ -1,1 +1,1 @@
-web: gunicorn SAAS_OGRENCI_AJANDA.app:app
+web: python -c "from SAAS_OGRENCI_AJANDA.app import app, db; with app.app_context(): db.create_all()" && gunicorn SAAS_OGRENCI_AJANDA.app:app
