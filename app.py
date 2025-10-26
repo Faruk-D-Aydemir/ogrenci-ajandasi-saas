@@ -42,8 +42,8 @@ Session(app)
 db = SQLAlchemy(app)
 
 # --- TABLOLARI GECİKME İLE OLUŞTURMA İŞLEVİ (RENDER UYUMLULUĞU İÇİN) ---
+# Bu, veritabanı bağlantısı kurulduktan sonra tabloyu oluşturmayı garanti eder.
 def create_tables(uygulama):
-    # Uygulama bağlamını kullanarak tablo oluşturmayı zorlar.
     with uygulama.app_context():
         try:
             db.create_all()
