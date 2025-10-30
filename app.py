@@ -41,34 +41,7 @@ Session(app)
 
 db = SQLAlchemy(app)
 
-# --- TABLOLARI GECİKME İLE OLUŞTURMA İŞLEVİ (RENDER UYUMLULUĞU İÇİN) ---
-# Bu, veritabanı bağlantısı kurulduktan sonra tabloyu oluşturmayı garanti eder.
-def create_tables(uygulama):
-    with uygulama.app_context():
-        try:
-            db.create_all()
-            print("INFO: Veritabanı tabloları başarıyla oluşturuldu veya zaten mevcut.")
-        except Exception as e:
-            # Hata olsa bile uygulamanın çökmesini engeller
-            print(f"HATA: Tablo oluşturulurken bir hata oluştu: {e}")
-            pass
-
-# Uygulama hazır olduğunda (run time) tabloları oluştur.
-create_tables(app)
-# ------------------------------------------------------------------------
-
-
-# --- FLASK-LOGIN YAPILANDIRMASI ---
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'giris' 
-login_manager.login_message = "Bu sayfaya erişmek için lütfen giriş yapın."
-
-@login_manager.user_loader
-def load_user(user_id):
-    return Kullanici.query.get(int(user_id))
-
-# --- VERİ TABANI MODELLERİ (SQLAlchemy) ---
+# --- VERİ TABANI MODELLERİ (SQLALCHEMY - db.create_all'dan ÖNCE OLMALI) ---
 class Kullanici(UserMixin, db.Model):
     # PostgreSQL uyumu için tablo adını küçük harf yap
     __tablename__ = 'kullanici' 
@@ -96,6 +69,34 @@ class Kayit(db.Model):
     
     # ForeignKey içindeki referansı da küçük harfe çevir
     kullanici_id = db.Column(db.Integer, db.ForeignKey('kullanici.id'), nullable=False)
+
+# --- TABLOLARI GECİKME İLE OLUŞTURMA İŞLEVİ (MODELLERDEN SONRA ÇALIŞMALI) ---
+def create_tables(uygulama):
+    # Uygulama bağlamını kullanarak tablo oluşturmayı zorlar.
+    with uygulama.app_context():
+        try:
+            db.create_all()
+            # Bu print çıktısı Render loglarında görünmeli
+            print("INFO: Veritabanı tabloları başarıyla oluşturuldu veya zaten mevcut.") 
+        except Exception as e:
+            print(f"HATA: Tablo oluşturulurken bir hata oluştu: {e}")
+            pass
+
+# Uygulama hazır olduğunda (run time) tabloları oluştur.
+create_tables(app)
+# ------------------------------------------------------------------------
+
+
+# --- FLASK-LOGIN YAPILANDIRMASI ---
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'giris' 
+login_manager.login_message = "Bu sayfaya erişmek için lütfen giriş yapın."
+
+@login_manager.user_loader
+def load_user(user_id):
+    return Kullanici.query.get(int(user_id))
+
 
 # --- YOUTUBE ARAMA FONKSİYONU ---
 def youtube_arama(arama_sorgusu):
