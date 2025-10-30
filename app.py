@@ -76,7 +76,6 @@ def create_tables(uygulama):
     with uygulama.app_context():
         try:
             db.create_all()
-            # Bu print çıktısı Render loglarında görünmeli
             print("INFO: Veritabanı tabloları başarıyla oluşturuldu veya zaten mevcut.") 
         except Exception as e:
             print(f"HATA: Tablo oluşturulurken bir hata oluştu: {e}")
@@ -161,7 +160,14 @@ def kayitol():
         eposta = request.form.get('eposta')
         parola = request.form.get('parola')
         
+        # --- Form Boş Kontrolü (Eklenen Güvenlik) ---
+        if not kullanici_adi or not eposta or not parola:
+             flash('Tüm alanları doldurmanız gerekmektedir.', 'danger')
+             return redirect(url_for('kayitol'))
+        # ---------------------------------------------
+             
         try:
+            # E-posta zaten kayıtlı mı?
             if Kullanici.query.filter_by(eposta=eposta).first():
                 flash('Bu e-posta adresi zaten kayıtlı.', 'warning')
                 return redirect(url_for('kayitol'))
@@ -171,7 +177,13 @@ def kayitol():
             
             db.session.add(yeni_kullanici)
             db.session.commit()
+            
         except Exception as e:
+            # Hata durumunda veritabanı işlemini geri al
+            db.session.rollback() 
+            
+            # Hatanın ne olduğunu ekrana yazdır (CRITICAL FOR DEBUGGING)
+            print(f"KAYIT HATA LOGU: {e}") 
             flash(f'Kayıt işlemi sırasında veritabanı hatası oluştu: {e}', 'danger')
             return redirect(url_for('kayitol'))
         
@@ -260,6 +272,7 @@ def ajanda_olustur():
             
             flash('Yeni ajanda kaydı başarıyla oluşturuldu!', 'success')
         except Exception as e:
+            db.session.rollback() # Hata durumunda rollback
             flash(f'Kayıt oluşturulurken bir hata oluştu: {e}', 'danger')
             
         return redirect(url_for('index'))
@@ -277,6 +290,7 @@ def kayit_sil(kayit_id):
         
         flash('Ajanda kaydı başarıyla silindi.', 'info')
     except Exception as e:
+        db.session.rollback() # Hata durumunda rollback
         flash(f'Silme işlemi sırasında hata oluştu: {e}', 'danger')
         
     return redirect(url_for('index'))
