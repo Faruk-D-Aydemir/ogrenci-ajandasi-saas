@@ -48,7 +48,7 @@ class Kullanici(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     kullanici_adi = db.Column(db.String(80), unique=True, nullable=False)
     eposta = db.Column(db.String(120), unique=True, nullable=False)
-    parola_hash = db.Column(db.String(128))
+    parola_hash = db.Column(db.String(256)) # <--- KRİTİK DÜZELTME
     kayitlar = db.relationship('Kayit', backref='yazar', lazy=True)
 
     def set_password(self, parola):
