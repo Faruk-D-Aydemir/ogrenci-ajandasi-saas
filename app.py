@@ -46,9 +46,9 @@ class Kullanici(UserMixin, db.Model):
     # PostgreSQL uyumu için tablo adını küçük harf yap
     __tablename__ = 'kullanici' 
     id = db.Column(db.Integer, primary_key=True)
-    kullanici_adi = db.Column(db.String(255), unique=True, nullable=False) # Boyut 80'den 255'e artırıldı
-    eposta = db.Column(db.String(255), unique=True, nullable=False) # Boyut 120'den 255'e artırıldı
-    parola_hash = db.Column(db.String(512)) # Boyut 128/256'dan 512'ye artırılarak maksimum güvenliğe çıkarıldı
+    kullanici_adi = db.Column(db.String(255), unique=True, nullable=False) # Boyut 255
+    eposta = db.Column(db.String(255), unique=True, nullable=False) # Boyut 255
+    parola_hash = db.Column(db.String(512)) # <--- KRİTİK DÜZELTME: Boyut 512
     kayitlar = db.relationship('Kayit', backref='yazar', lazy=True)
 
     def set_password(self, parola):
