@@ -1,156 +1,436 @@
-/* Genel Stil Ayarları */
-body {
-    font-family: 'Arial', sans-serif;
-    background-color: #f4f7f6;
-    color: #333;
+/* ========================================= */
+/* 1. GENEL RESET VE TEMEL STİL */
+/* ========================================= */
+:root {
+    /* Renk Paleti */
+    --primary-color: #3f51b5; /* Koyu Mavi - Ana Marka Rengi */
+    --secondary-color: #f5f5f5; /* Çok Açık Gri - Arka Planlar */
+    --text-color: #333; /* Koyu Gri - Ana Metin */
+    --light-text-color: #666; /* Açık Gri - İkincil Metin */
+    --white: #ffffff;
+    --success-color: #4caf50;
+    --danger-color: #f44336;
+    
+    /* Gölgeleme */
+    --soft-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+* {
     margin: 0;
     padding: 0;
-}
-
-/* Ana Konteyner */
-.container {
-    width: 90%;
-    max-width: 1200px;
-    margin: 50px auto;
-    background-color: #fff;
-    padding: 30px;
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-/* Başlıklar */
-h1 {
-    color: #007bff;
-    text-align: center;
-    margin-bottom: 30px;
-}
-
-/* Form Stilleri */
-form {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-input[type="text"], input[type="email"], input[type="password"], input[type="date"], textarea {
-    padding: 12px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    font-size: 16px;
-    width: 100%;
     box-sizing: border-box;
 }
 
-button {
-    background-color: #28a745;
-    color: white;
-    padding: 12px 20px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 18px;
-    transition: background-color 0.3s;
+body {
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    padding-top: 60px; /* Sabit başlık için boşluk */
 }
 
-button:hover {
-    background-color: #218838;
+a {
+    text-decoration: none;
+    color: var(--primary-color);
+    transition: color 0.2s ease-in-out;
 }
 
-/* Mesajlar (Flash) */
-.flash-message {
-    padding: 15px;
-    margin-bottom: 20px;
-    border-radius: 5px;
-    font-weight: bold;
-    text-align: center;
+a:hover {
+    color: var(--primary-color);
+    opacity: 0.8;
 }
 
-.success {
-    background-color: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
-}
+/* ========================================= */
+/* 2. ANA YAPI VE BAŞLIK (HEADER) */
+/* ========================================= */
 
-.danger {
-    background-color: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-}
-
-/* Navigasyon/Başlık Bölümü */
 .header {
+    background-color: var(--white);
+    color: var(--text-color);
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 60px;
+    box-shadow: var(--soft-shadow);
+    z-index: 1000;
+    padding: 0 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-bottom: 20px;
-    border-bottom: 1px solid #eee;
 }
 
-.header a {
-    text-decoration: none;
-    color: #007bff;
-    font-weight: bold;
-    padding: 8px 15px;
-    border: 1px solid #007bff;
-    border-radius: 5px;
-    transition: background-color 0.3s, color 0.3s;
+.logo a {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary-color);
 }
 
-.header a:hover {
-    background-color: #007bff;
-    color: white;
-}
-
-/* Ajanda Kayıtları */
-.ajanda-kayitlari {
+.nav-links {
     list-style: none;
-    padding: 0;
+    display: flex;
+    gap: 20px;
 }
 
-.kayit-item {
-    background-color: #fff;
-    border: 1px solid #ddd;
-    margin-bottom: 15px;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.kalan-gun-etiketi {
+.nav-links a {
+    color: var(--text-color);
+    font-weight: 500;
     padding: 5px 10px;
-    border-radius: 5px;
-    color: white;
-    font-weight: bold;
-    font-size: 0.9em;
-    display: inline-block;
+    border-radius: 4px;
+    transition: background-color 0.3s;
 }
 
-.kritik { background-color: #dc3545; }
-.yogun { background-color: #ffc107; color: #333; }
-.planli { background-color: #28a745; }
-.gecti { background-color: #6c757d; }
-
-.video-list h4 {
-    margin-top: 15px;
-    border-top: 1px solid #eee;
-    padding-top: 10px;
-    color: #007bff;
+.nav-links a:hover {
+    background-color: var(--secondary-color);
+    color: var(--primary-color);
 }
 
-.video-list ul {
+/* ========================================= */
+/* 3. CONTAINER VE MESAJLAR */
+/* ========================================= */
+.container {
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+.flash-message {
+    padding: 15px 20px;
+    margin-bottom: 20px;
+    border-radius: 6px;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.flash-message.success {
+    background-color: var(--success-color);
+    color: var(--white);
+}
+
+.flash-message.danger {
+    background-color: var(--danger-color);
+    color: var(--white);
+}
+
+.flash-message.info {
+    background-color: var(--primary-color);
+    color: var(--white);
+}
+
+/* ========================================= */
+/* 4. FORM STİLLERİ (Giriş/Kayıt) */
+/* ========================================= */
+
+.auth-card {
+    background-color: var(--white);
+    padding: 40px;
+    border-radius: 8px;
+    box-shadow: var(--soft-shadow);
+    max-width: 400px;
+    margin: 50px auto;
+}
+
+.auth-card h2 {
+    font-size: 2rem;
+    margin-bottom: 25px;
+    color: var(--text-color);
+    text-align: center;
+}
+
+.auth-card input[type="text"],
+.auth-card input[type="email"],
+.auth-card input[type="password"] {
+    width: 100%;
+    padding: 12px 15px;
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.auth-card input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(63, 81, 181, 0.2);
+    outline: none;
+}
+
+.auth-card button {
+    width: 100%;
+    padding: 12px;
+    background-color: var(--primary-color);
+    color: var(--white);
+    border: none;
+    border-radius: 4px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.auth-card button:hover {
+    background-color: #303f9f; /* Daha koyu ton */
+}
+
+.auth-card p {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 0.9rem;
+    color: var(--light-text-color);
+}
+
+
+/* ========================================= */
+/* 5. AJANDA SAYFASI (INDEX.HTML) */
+/* ========================================= */
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 30px;
+}
+
+/* Yeni Kayıt Ekleme Formu */
+.add-form-card {
+    background-color: var(--white);
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: var(--soft-shadow);
+}
+
+.add-form-card h2 {
+    margin-bottom: 20px;
+    color: var(--primary-color);
+    border-bottom: 2px solid var(--secondary-color);
+    padding-bottom: 10px;
+}
+
+.add-form-card form {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    align-items: end;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: var(--text-color);
+    font-size: 0.9rem;
+}
+
+.add-form-card input,
+.add-form-card textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    transition: border-color 0.3s;
+}
+
+.add-form-card input:focus,
+.add-form-card textarea:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(63, 81, 181, 0.2);
+    outline: none;
+}
+
+.add-form-card textarea {
+    resize: vertical;
+}
+
+.add-form-card button {
+    padding: 10px 20px;
+    background-color: var(--success-color);
+    color: var(--white);
+    border: none;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    grid-column: 3 / 4; /* Üçüncü sütunda başlasın */
+}
+
+.add-form-card button:hover {
+    background-color: #388e3c;
+}
+
+/* Ajanda Kayıt Listesi */
+.ajanda-listesi {
     list-style: none;
-    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
 }
 
-.video-list li {
-    margin-bottom: 8px;
+.ajanda-item {
+    background-color: var(--white);
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: var(--soft-shadow);
+    border-left: 5px solid var(--primary-color);
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 50px; /* Ders/Konu, Tarih, Etiket, Silme */
+    gap: 15px;
+    align-items: center;
 }
 
-.video-list a {
-    color: #007bff;
-    text-decoration: none;
+.item-details h3 {
+    font-size: 1.25rem;
+    color: var(--text-color);
+    margin-bottom: 5px;
 }
 
-.video-list a:hover {
-    text-decoration: underline;
+.item-details p {
+    font-size: 0.9rem;
+    color: var(--light-text-color);
+}
+
+.item-date, .item-etiket {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* Etiket Renkleri */
+.etiket {
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    text-align: center;
+    font-weight: 700;
+}
+
+.etiket.kritik {
+    background-color: var(--danger-color);
+    color: var(--white);
+}
+
+.etiket.yogun {
+    background-color: #ff9800; /* Turuncu */
+    color: var(--white);
+}
+
+.etiket.planli {
+    background-color: var(--success-color);
+    color: var(--white);
+}
+
+.etiket.gecmis {
+    background-color: var(--light-text-color);
+    color: var(--white);
+}
+
+/* Silme Butonu */
+.delete-form button {
+    background: none;
+    border: none;
+    color: var(--danger-color);
+    cursor: pointer;
+    font-size: 1.2rem;
+    opacity: 0.7;
+    transition: opacity 0.3s;
+}
+
+.delete-form button:hover {
+    opacity: 1;
+}
+
+/* Video Sonuçları */
+.video-sonuclari {
+    grid-column: 1 / -1; /* Tüm sütunlara yayılsın */
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px dashed var(--secondary-color);
+}
+
+.video-sonuclari h4 {
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+.video-list {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.video-item {
+    flex: 1 1 calc(33.333% - 15px);
+    background-color: var(--secondary-color);
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.video-item a {
+    font-weight: 600;
+    display: block;
+}
+
+/* ========================================= */
+/* 6. RESPONSIVE DÜZENLEMELER */
+/* ========================================= */
+
+@media (max-width: 900px) {
+    .ajanda-item {
+        grid-template-columns: 1fr 1fr; /* İki sütuna düşür */
+        grid-template-rows: auto auto;
+        border-left: none;
+        border-top: 5px solid var(--primary-color);
+    }
+    
+    .item-details {
+        grid-column: 1 / 3; /* Ders ve Konu tam satıra yayılsın */
+    }
+
+    .item-etiket {
+        grid-column: 1 / 2;
+    }
+
+    .item-date {
+        grid-column: 2 / 3;
+        text-align: right;
+    }
+    
+    .delete-form {
+        grid-column: 2 / 3;
+        grid-row: 2 / 3;
+        text-align: right;
+    }
+
+    .add-form-card form {
+        grid-template-columns: 1fr; /* Tek sütuna düşür */
+    }
+    
+    .add-form-card button {
+        grid-column: 1 / 2;
+    }
+
+    .video-item {
+        flex: 1 1 100%; /* Mobil cihazlarda videolar tam genişlikte */
+    }
+}
+
+@media (max-width: 600px) {
+    .container {
+        margin: 20px auto;
+    }
+    
+    .header {
+        padding: 0 10px;
+    }
+    
+    .nav-links {
+        gap: 10px;
+    }
+    
+    .auth-card {
+        padding: 30px 20px;
+    }
 }
