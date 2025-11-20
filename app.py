@@ -81,7 +81,6 @@ class ProgramGorev(db.Model):
 def create_tables(uygulama):
     with uygulama.app_context():
         try:
-            # db.drop_all() KALDIRILMIŞTIR. Yalnızca yeni tabloları oluşturur.
             db.create_all()
             print("INFO: Veritabanı tabloları başarıyla oluşturuldu/güncellendi.") 
         except Exception as e:
@@ -121,7 +120,7 @@ def youtube_arama(arama_sorgusu):
     except Exception:
         return ""
 
-# --- PROGRAM OLUŞTURMA ALGORİTMASI ---
+# --- PROGRAM OLUŞTURMA ALGORİTMASI (DÜZELTİLMİŞ) ---
 def program_olustur_algo(kullanici_id):
     kullanici = Kullanici.query.get(kullanici_id)
     if not kullanici: return False
@@ -189,17 +188,29 @@ def program_olustur_algo(kullanici_id):
                 calisma_baslangici = datetime.combine(suanki_tarih, time.fromisoformat(bos_bas_str))
                 calisma_bitisi = datetime.combine(suanki_tarih, time.fromisoformat(bos_bit_str))
                 
+                # Okul/Sınırlı saatleri kontrol et
                 okul_baslangic_dt = datetime.combine(suanki_tarih, okul_bas)
                 okul_bitis_dt = datetime.combine(suanki_tarih, okul_bit)
                 
-                # Okul saatlerini atla
+                # --- 🛠️ DÜZELTİLMİŞ OKUL SAATLERİ ATLATMA MANTIĞI ---
+                
+                # Eğer boş zaman okul saatleriyle çakışıyorsa (Okul sonrası çalışmaya başla veya atla)
                 if calisma_baslangici < okul_bitis_dt and calisma_bitisi > okul_baslangic_dt:
-                    if calisma_baslangici < okul_baslangic_dt and calisma_bitisi > okul_bitis_dt:
+                    
+                    if calisma_baslangici >= okul_bitis_dt:
+                        # Eğer boş zaman okul bittikten sonra başlıyorsa sorun yok
+                        pass 
+                    elif calisma_baslangici < okul_bitis_dt and calisma_bitisi > okul_bitis_dt:
+                        # Boş zaman okul saatleri içinde başlıyor, başlangıcı okul bitişine taşı
                         calisma_baslangici = okul_bitis_dt
+                    elif calisma_baslangici < okul_baslangic_dt and calisma_bitisi > okul_bitis_dt:
+                        # Boş zaman okul öncesi ve sonrası kapsıyorsa, başlangıcı okul bitişine taşı (Okul sonrası çalış)
+                        calisma_baslangici = okul_bitis_dt 
                     elif calisma_baslangici >= okul_baslangic_dt and calisma_bitisi <= okul_bitis_dt:
+                        # Boş zaman tamamen okul içinde, bu günü ATLA
                         continue 
-                    elif calisma_baslangici < okul_bitis_dt:
-                        calisma_baslangici = okul_bitis_dt
+                
+                # ----------------------------------------------------
 
                 suanki_zaman = calisma_baslangici
                 
@@ -237,7 +248,7 @@ def program_olustur_algo(kullanici_id):
 
 @app.route('/')
 def ana_sayfa_yonlendirme():
-    # 🚨 404 HATASI DÜZELTME ROTASI
+    # 404 HATASI DÜZELTME ROTASI
     if not current_user.is_authenticated:
         return redirect(url_for('giris'))
     return redirect(url_for('index'))
