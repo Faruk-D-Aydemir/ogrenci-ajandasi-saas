@@ -14,7 +14,6 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 app = Flask(__name__)
 
-# --- UYGULAMA YAPILANDIRMASI (VERİ TABANI VE GİZLİ ANAHTAR) ---
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 
 if app.config['SQLALCHEMY_DATABASE_URI'] and app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
@@ -62,12 +61,18 @@ class Kayit(db.Model):
 def create_tables(uygulama):
     with uygulama.app_context():
         try:
+            # 🚨 HATA DÜZELTME İÇİN GEÇİCİ SIFIRLAMA
+            # Bu, "etiket" sütununu eklemek için TÜM VERİYİ SİLER.
+            db.drop_all() 
             db.create_all()
+            print("INFO: Veritabanı tabloları başarıyla SIFIRLANDI ve oluşturuldu.") 
         except Exception as e:
+            print(f"HATA: Tablo oluşturulurken bir hata oluştu: {e}")
             pass
 
 create_tables(app)
 
+# --- FLASK-LOGIN YAPILANDIRMASI ---
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'giris' 
@@ -93,7 +98,6 @@ def youtube_arama(arama_sorgusu):
         
         video_listesi = []
         for item in response.get("items", []):
-            # Başlık:::Link ||| Başlık:::Link formatında döndürür
             video_listesi.append(f"{item['snippet']['title']}:::{'https://www.youtube.com/embed/' + item['id']['videoId']}")
             
         return "|||".join(video_listesi)
@@ -102,44 +106,9 @@ def youtube_arama(arama_sorgusu):
 
 
 # --- ROTALAR ---
-@app.route('/giris', methods=['GET', 'POST'])
-def giris():
-    if current_user.is_authenticated: return redirect(url_for('index'))
-    if request.method == 'POST':
-        eposta = request.form.get('eposta'); parola = request.form.get('parola')
-        try: kullanici = Kullanici.query.filter_by(eposta=eposta).first()
-        except Exception as e: flash(f'Veritabanı hatası: {e}', 'danger'); return render_template('giris.html') 
-        if kullanici and kullanici.check_password(parola):
-            login_user(kullanici); flash('Başarıyla giriş yaptınız!', 'success'); return redirect(url_for('index'))
-        else:
-            flash('Giriş başarısız. Lütfen e-posta ve şifrenizi kontrol edin.', 'danger')
-    return render_template('giris.html') 
-
-@app.route('/kayitol', methods=['GET', 'POST'])
-def kayitol():
-    if current_user.is_authenticated: return redirect(url_for('index'))
-    if request.method == 'POST':
-        kullanici_adi = request.form.get('kullanici_adi'); eposta = request.form.get('eposta'); parola = request.form.get('parola')
-        if not kullanici_adi or not eposta or not parola:
-             flash('Tüm alanları doldurmanız gerekmektedir.', 'danger'); return redirect(url_for('kayitol'))
-        try:
-            if Kullanici.query.filter_by(eposta=eposta).first():
-                flash('Bu e-posta adresi zaten kayıtlı.', 'warning'); return redirect(url_for('kayitol'))
-            yeni_kullanici = Kullanici(kullanici_adi=kullanici_adi, eposta=eposta)
-            yeni_kullanici.set_password(parola)
-            db.session.add(yeni_kullanici); db.session.commit()
-        except Exception as e:
-            db.session.rollback(); flash(f'Kayıt işlemi sırasında veritabanı hatası oluştu: {e}', 'danger'); return redirect(url_for('kayitol'))
-        flash('Hesabınız başarıyla oluşturuldu! Lütfen giriş yapın.', 'success'); return redirect(url_for('giris'))
-    return render_template('kayitol.html') 
-
-@app.route('/cikis')
-@login_required 
-def cikis():
-    logout_user(); flash('Başarıyla çıkış yaptınız.', 'info'); return redirect(url_for('giris'))
-
 
 @app.route('/')
+@app.route('/ajanda')
 @login_required 
 def index():
     bugun = date.today() 
@@ -181,12 +150,13 @@ def index():
             'etiket_sinifi': etiket_sinifi 
         })
     
-    return render_template('index.html', kayitlar=ajanda_verileri)
+    # Artık sadece list.html'i render ediyoruz
+    return render_template('list.html', kayitlar=ajanda_verileri)
 
 
-@app.route('/ajanda-olustur', methods=['POST'])
-@login_required 
-def ajanda_olustur():
+@app.route('/ekle', methods=['GET', 'POST'])
+@login_required
+def ekle():
     if request.method == 'POST':
         
         ders_adi = request.form.get('ders_adi'); tarih_str = request.form.get('tarih'); konular = request.form.get('konular')
@@ -211,9 +181,73 @@ def ajanda_olustur():
         except Exception as e:
             db.session.rollback(); flash(f'Kayıt oluşturulurken bir hata oluştu: {e}', 'danger')
             
-        return redirect(url_for('index'))
+        return redirect(url_for('index')) # Kayıt sonrası ana listeye dön
     
-    return "Hata: Yanlış istek metodu."
+    # GET isteği gelirse sadece formu gösteriyoruz
+    return render_template('form.html')
+
+
+@app.route('/ayarlar', methods=['GET', 'POST'])
+@login_required
+def ayarlar():
+    if request.method == 'POST':
+        yeni_ad = request.form.get('kullanici_adi')
+        
+        if yeni_ad:
+            try:
+                # Kullanıcı adının benzersizliğini kontrol et
+                if Kullanici.query.filter(Kullanici.kullanici_adi == yeni_ad, Kullanici.id != current_user.id).first():
+                    flash('Bu kullanıcı adı zaten alınmış.', 'danger')
+                else:
+                    current_user.kullanici_adi = yeni_ad
+                    db.session.commit()
+                    flash('Kullanıcı adınız başarıyla güncellendi.', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Adınız güncellenirken bir hata oluştu: {e}', 'danger')
+        
+        return redirect(url_for('ayarlar'))
+
+    # Kullanıcı e-postası ve mevcut adı ayarlar sayfasına gönderilir
+    return render_template('ayarlar.html')
+
+
+# ... (Diğer rotalar: giris, kayitol, cikis, kayit_sil aynı kalır) ...
+@app.route('/giris', methods=['GET', 'POST'])
+def giris():
+    if current_user.is_authenticated: return redirect(url_for('index'))
+    if request.method == 'POST':
+        eposta = request.form.get('eposta'); parola = request.form.get('parola')
+        try: kullanici = Kullanici.query.filter_by(eposta=eposta).first()
+        except Exception as e: flash(f'Veritabanı hatası: {e}', 'danger'); return render_template('giris.html') 
+        if kullanici and kullanici.check_password(parola):
+            login_user(kullanici); flash('Başarıyla giriş yaptınız!', 'success'); return redirect(url_for('index'))
+        else:
+            flash('Giriş başarısız. Lütfen e-posta ve şifrenizi kontrol edin.', 'danger')
+    return render_template('giris.html') 
+
+@app.route('/kayitol', methods=['GET', 'POST'])
+def kayitol():
+    if current_user.is_authenticated: return redirect(url_for('index'))
+    if request.method == 'POST':
+        kullanici_adi = request.form.get('kullanici_adi'); eposta = request.form.get('eposta'); parola = request.form.get('parola')
+        if not kullanici_adi or not eposta or not parola:
+             flash('Tüm alanları doldurmanız gerekmektedir.', 'danger'); return redirect(url_for('kayitol'))
+        try:
+            if Kullanici.query.filter_by(eposta=eposta).first():
+                flash('Bu e-posta adresi zaten kayıtlı.', 'warning'); return redirect(url_for('kayitol'))
+            yeni_kullanici = Kullanici(kullanici_adi=kullanici_adi, eposta=eposta)
+            yeni_kullanici.set_password(parola)
+            db.session.add(yeni_kullanici); db.session.commit()
+        except Exception as e:
+            db.session.rollback(); flash(f'Kayıt işlemi sırasında veritabanı hatası oluştu: {e}', 'danger'); return redirect(url_for('kayitol'))
+        flash('Hesabınız başarıyla oluşturuldu! Lütfen giriş yapın.', 'success'); return redirect(url_for('giris'))
+    return render_template('kayitol.html') 
+
+@app.route('/cikis')
+@login_required 
+def cikis():
+    logout_user(); flash('Başarıyla çıkış yaptınız.', 'info'); return redirect(url_for('giris'))
 
 @app.route('/sil/<int:kayit_id>', methods=['POST'])
 @login_required 

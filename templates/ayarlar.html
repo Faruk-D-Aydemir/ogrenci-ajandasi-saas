@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ayarlar - Profil</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body class="page-settings">
+
+<header class="header">
+    <div class="logo">
+        <a href="{{ url_for('index') }}">📝 Öğrenci Ajandam</a>
+    </div>
+    
+    <nav>
+        <button class="hamburger-menu" id="hamburger-toggle">☰</button>
+
+        <ul class="nav-links" id="nav-menu">
+            <li><a href="{{ url_for('index') }}"><i class="fas fa-star"></i> Ajandam</a></li>
+            <li><a href="{{ url_for('ekle') }}"><i class="fas fa-plus-circle"></i> Ders/Sınav Ekle</a></li>
+            <li><a href="{{ url_for('ayarlar') }}"><i class="fas fa-cog"></i> Ayarlar</a></li> 
+            <li><a href="{{ url_for('cikis') }}"><i class="fas fa-sign-out-alt"></i> Çıkış Yap</a></li>
+        </ul>
+    </nav>
+    <button id="theme-toggle" class="theme-toggle">🌙</button>
+</header>
+
+<div class="container">
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="messages">
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="auth-card" style="max-width: 600px; margin: 40px auto;">
+        <h2><i class="fas fa-user-cog"></i> Profil Ayarları</h2>
+
+        <div class="form-group" style="margin-bottom: 30px;">
+            <label>Mevcut Kullanıcı Adınız:</label>
+            <p style="font-size: 1.3rem; font-weight: bold; color: var(--brand-color);">{{ current_user.kullanici_adi }}</p>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 40px;">
+            <label>E-posta Adresiniz:</label>
+            <p style="font-size: 1rem; color: var(--text-light);">{{ current_user.eposta }} (Değiştirilemez)</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('ayarlar') }}">
+            
+            <label for="kullanici_adi">Kullanıcı Adını Değiştir</label>
+            <input type="text" id="kullanici_adi" name="kullanici_adi" 
+                   placeholder="Yeni Kullanıcı Adı (Örn: Gemini)" required>
+            
+            <button type="submit"><i class="fas fa-pen-fancy"></i> Adı Güncelle</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    const themeToggle = document.getElementById('theme-toggle');
+    const body = document.body;
+    
+    const currentTheme = localStorage.getItem('theme');
+    if (currentTheme === 'dark') {
+        body.classList.add('dark-mode');
+        themeToggle.textContent = '☀️';
+    } else {
+        themeToggle.textContent = '🌙';
+    }
+
+    themeToggle.addEventListener('click', () => {
+        body.classList.toggle('dark-mode');
+        
+        let theme = body.classList.contains('dark-mode') ? 'dark' : 'light';
+        localStorage.setItem('theme', theme);
+        
+        themeToggle.textContent = (theme === 'dark') ? '☀️' : '🌙';
+    });
+
+    const hamburgerToggle = document.getElementById('hamburger-toggle');
+    const navMenu = document.getElementById('nav-menu');
+
+    hamburgerToggle.addEventListener('click', () => {
+        navMenu.classList.toggle('active');
+    });
+    
+    document.addEventListener('click', (event) => {
+        if (!navMenu.contains(event.target) && !hamburgerToggle.contains(event.target)) {
+            navMenu.classList.remove('active');
+        }
+    });
+
+    const navLinks = document.querySelectorAll('.nav-links a');
+    navLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            navMenu.classList.remove('active');
+        });
+    });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ders/Sınav Ekle</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body class="page-form">
+
+<header class="header">
+    <div class="logo">
+        <a href="{{ url_for('index') }}">📝 Öğrenci Ajandam</a>
+    </div>
+    
+    <nav>
+        <button class="hamburger-menu" id="hamburger-toggle">☰</button>
+
+        <ul class="nav-links" id="nav-menu">
+            <li><a href="{{ url_for('index') }}"><i class="fas fa-star"></i> Ajandam</a></li>
+            <li><a href="{{ url_for('ekle') }}"><i class="fas fa-plus-circle"></i> Ders/Sınav Ekle</a></li>
+            <li><a href="{{ url_for('ayarlar') }}"><i class="fas fa-cog"></i> Ayarlar</a></li> 
+            <li><a href="{{ url_for('cikis') }}"><i class="fas fa-sign-out-alt"></i> Çıkış Yap</a></li>
+        </ul>
+    </nav>
+    <button id="theme-toggle" class="theme-toggle">🌙</button>
+</header>
+
+<div class="container">
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="messages">
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="dashboard-grid">
+        <div class="add-form-card" style="grid-column: 1 / -1;">
+            <h2>Yeni Ders veya Sınav Kaydı Ekle</h2>
+            <form method="POST" action="{{ url_for('ekle') }}">
+                
+                <div class="form-group">
+                    <label for="ders_adi">Ders Adı</label>
+                    <input type="text" id="ders_adi" name="ders_adi" placeholder="Örn: Yapay Zeka" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="tarih">Sınav/Teslim Tarihi</label>
+                    <input type="date" id="tarih" name="tarih" required>
+                </div>
+                
+                <div class="form-group" style="grid-column: 1 / 5;">
+                    <label for="konular">Konu/Açıklama (veya YouTube Arama Sorgusu)</label>
+                    <textarea id="konular" name="konular" rows="3" placeholder="Örn: Derin Öğrenme Mimarileri veya 'Deep Learning Architectures YouTube'"></textarea>
+                </div>
+
+                <button type="submit" style="grid-column: 5 / 5;">Kaydı Ekle & Video Ara</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    const themeToggle = document.getElementById('theme-toggle');
+    const body = document.body;
+    
+    const currentTheme = localStorage.getItem('theme');
+    if (currentTheme === 'dark') {
+        body.classList.add('dark-mode');
+        themeToggle.textContent = '☀️';
+    } else {
+        themeToggle.textContent = '🌙';
+    }
+
+    themeToggle.addEventListener('click', () => {
+        body.classList.toggle('dark-mode');
+        
+        let theme = body.classList.contains('dark-mode') ? 'dark' : 'light';
+        localStorage.setItem('theme', theme);
+        
+        themeToggle.textContent = (theme === 'dark') ? '☀️' : '🌙';
+    });
+
+    const hamburgerToggle = document.getElementById('hamburger-toggle');
+    const navMenu = document.getElementById('nav-menu');
+
+    hamburgerToggle.addEventListener('click', () => {
+        navMenu.classList.toggle('active');
+    });
+    
+    document.addEventListener('click', (event) => {
+        if (!navMenu.contains(event.target) && !hamburgerToggle.contains(event.target)) {
+            navMenu.classList.remove('active');
+        }
+    });
+
+    const navLinks = document.querySelectorAll('.nav-links a');
+    navLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            navMenu.classList.remove('active');
+        });
+    });
+</script>
+
+</body>
+</html>

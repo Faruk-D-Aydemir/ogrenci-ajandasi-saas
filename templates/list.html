@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ajandam - Kayıt Listesi</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body class="page-list">
+
+<header class="header">
+    <div class="logo">
+        <a href="{{ url_for('index') }}">📝 Öğrenci Ajandam</a>
+    </div>
+    
+    <nav>
+        <button class="hamburger-menu" id="hamburger-toggle">☰</button>
+
+        <ul class="nav-links" id="nav-menu">
+            <li><a href="{{ url_for('index') }}"><i class="fas fa-star"></i> Ajandam</a></li>
+            <li><a href="{{ url_for('ekle') }}"><i class="fas fa-plus-circle"></i> Ders/Sınav Ekle</a></li>
+            <li><a href="{{ url_for('ayarlar') }}"><i class="fas fa-cog"></i> Ayarlar</a></li> 
+            <li><a href="{{ url_for('cikis') }}"><i class="fas fa-sign-out-alt"></i> Çıkış Yap</a></li>
+        </ul>
+    </nav>
+    <button id="theme-toggle" class="theme-toggle">🌙</button>
+</header>
+
+
+<div class="container">
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="messages">
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <h1 style="margin-bottom: 30px; border-bottom: 2px solid var(--border-color); padding-bottom: 15px; color: var(--brand-color);">
+        Ajanda Kayıtlarım
+    </h1>
+
+    <div class="dashboard-grid">
+        
+        {% if kayitlar %}
+            <ul class="ajanda-listesi" style="grid-column: 1 / -1;">
+                {% for kayit in kayitlar %}
+                    <li class="ajanda-item">
+                        
+                        <div class="item-details">
+                            <h3>{{ kayit.ders_adi }}</h3>
+                            <p>{{ kayit.konular }}</p>
+                            <p style="font-size: 0.9rem; color: var(--text-light);">
+                                Kalan Gün: {{ kayit.kalan_gun }}
+                            </p>
+                        </div>
+                        
+                        <div class="item-date">
+                            {{ kayit.tarih.strftime('%d.%m.%Y') }}
+                        </div>
+
+                        <div class="item-etiket">
+                            <span class="etiket {{ kayit.etiket_sinifi }}">
+                                {{ kayit.etiket }}
+                            </span>
+                        </div>
+                        
+                        <form method="POST" action="{{ url_for('kayit_sil', kayit_id=kayit.id) }}" class="delete-form">
+                            <button type="submit" onclick="return confirm('Bu kaydı silmek istediğinizden emin misiniz?');">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </form>
+                        
+                        {% if kayit.video_sonuc %}
+                            <div class="video-sonuclari">
+                                <h4>Önerilen Video Kaynakları:</h4>
+                                <ul class="video-list">
+                                    {% for video_str in kayit.video_sonuc.split('|||') %}
+                                        {% set parts = video_str.split(':::') %}
+                                        {% if parts|length == 2 %}
+                                            <li class="video-item">
+                                                <a href="{{ parts[1] }}" target="_blank" title="{{ parts[0] }}">
+                                                    {{ parts[0] }}
+                                                </a>
+                                            </li>
+                                        {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <div class="auth-card" style="margin-top: 20px; grid-column: 1 / -1;">
+                <p>Henüz ajandana eklenmiş bir kaydın yok. Yeni bir kayıt eklemek için <a href="{{ url_for('ekle') }}">Ders/Sınav Ekle</a> sekmesini kullan!</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    const themeToggle = document.getElementById('theme-toggle');
+    const body = document.body;
+    
+    const currentTheme = localStorage.getItem('theme');
+    if (currentTheme === 'dark') {
+        body.classList.add('dark-mode');
+        themeToggle.textContent = '☀️';
+    } else {
+        themeToggle.textContent = '🌙';
+    }
+
+    themeToggle.addEventListener('click', () => {
+        body.classList.toggle('dark-mode');
+        
+        let theme = body.classList.contains('dark-mode') ? 'dark' : 'light';
+        localStorage.setItem('theme', theme);
+        
+        themeToggle.textContent = (theme === 'dark') ? '☀️' : '🌙';
+    });
+
+    const hamburgerToggle = document.getElementById('hamburger-toggle');
+    const navMenu = document.getElementById('nav-menu');
+
+    hamburgerToggle.addEventListener('click', () => {
+        navMenu.classList.toggle('active');
+    });
+    
+    document.addEventListener('click', (event) => {
+        if (!navMenu.contains(event.target) && !hamburgerToggle.contains(event.target)) {
+            navMenu.classList.remove('active');
+        }
+    });
+
+    const navLinks = document.querySelectorAll('.nav-links a');
+    navLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            navMenu.classList.remove('active');
+        });
+    });
+</script>
+
+</body>
+</html>
