@@ -5,28 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Giriş Yap - Öğrenci Ajandası</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Giriş Yap</h1>
-        
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
+
+<div class="container">
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="messages">
                 {% for category, message in messages %}
                     <div class="flash-message {{ category }}">{{ message }}</div>
                 {% endfor %}
-            {% endif %}
-        {% endwith %}
+            </div>
+        {% endif %}
+    {% endwith %}
 
+    <div class="auth-card">
+        <h2>Ajandana Giriş Yap</h2>
         <form method="POST" action="{{ url_for('giris') }}">
-            <input type="email" name="eposta" placeholder="E-posta Adresiniz" required>
-            <input type="password" name="parola" placeholder="Şifreniz" required>
-            <button type="submit">Giriş Yap</button>
+            
+            <input type="email" name="eposta" placeholder="E-posta Adresi" required>
+            <input type="password" name="parola" placeholder="Parola" required>
+            
+            <button type="submit"><i class="fas fa-sign-in-alt"></i> Giriş Yap</button>
         </form>
-
-        <p style="text-align: center; margin-top: 20px;">
-            Hesabınız yok mu? <a href="{{ url_for('kayitol') }}">Hemen Kayıt Olun</a>
-        </p>
+        <p>Hesabın yok mu? Hemen <a href="{{ url_for('kayitol') }}">Kaydol</a>.</p>
     </div>
+
+</div>
+
 </body>
 </html>

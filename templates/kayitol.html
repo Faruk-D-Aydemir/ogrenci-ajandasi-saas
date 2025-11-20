@@ -3,31 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kayıt Ol - Öğrenci Ajandası</title>
+    <title>Kaydol - Öğrenci Ajandası</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Yeni Hesap Oluştur</h1>
-        
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
+
+<div class="container">
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="messages">
                 {% for category, message in messages %}
                     <div class="flash-message {{ category }}">{{ message }}</div>
                 {% endfor %}
-            {% endif %}
-        {% endwith %}
+            </div>
+        {% endif %}
+    {% endwith %}
 
+    <div class="auth-card">
+        <h2>Yeni Hesap Oluştur</h2>
         <form method="POST" action="{{ url_for('kayitol') }}">
-            <input type="text" name="kullanici_adi" placeholder="Kullanıcı Adınız" required>
-            <input type="email" name="eposta" placeholder="E-posta Adresiniz" required>
-            <input type="password" name="parola" placeholder="Şifreniz (min. 6 karakter)" required>
-            <button type="submit">Kayıt Ol</button>
+            
+            <input type="text" name="kullanici_adi" placeholder="Kullanıcı Adı" required>
+            <input type="email" name="eposta" placeholder="E-posta Adresi" required>
+            <input type="password" name="parola" placeholder="Parola (Minimum 6 Karakter)" required>
+            
+            <button type="submit"><i class="fas fa-user-plus"></i> Hesap Oluştur</button>
         </form>
-
-        <p style="text-align: center; margin-top: 20px;">
-            Zaten hesabınız var mı? <a href="{{ url_for('giris') }}">Giriş Yapın</a>
-        </p>
+        <p>Zaten bir hesabın var mı? <a href="{{ url_for('giris') }}">Giriş Yap</a>.</p>
     </div>
+
+</div>
+
 </body>
 </html>

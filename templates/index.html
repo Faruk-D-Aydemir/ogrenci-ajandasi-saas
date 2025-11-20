@@ -3,76 +3,176 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ajandam - Öğrenci Ajandası</title>
+    <title>Ajandam - Ders ve Sınav Takip Sistemi</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Merhaba, {{ current_user.kullanici_adi }}!</h1>
-            <a href="{{ url_for('cikis') }}">Çıkış Yap</a>
-        </div>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
+<header class="header">
+    <div class="logo">
+        <a href="{{ url_for('index') }}">📝 Öğrenci Ajandam</a>
+    </div>
+    
+    <nav>
+        <button class="hamburger-menu" id="hamburger-toggle">☰</button>
+
+        <ul class="nav-links" id="nav-menu">
+            <li><a href="{{ url_for('index') }}"><i class="fas fa-star"></i> Ajandam</a></li>
+            <li><a href="#ajanda-formu"><i class="fas fa-plus-circle"></i> Ders/Sınav Ekle</a></li>
+            <li><a href="#"><i class="fas fa-cog"></i> Ayarlar</a></li> 
+            <li><a href="{{ url_for('cikis') }}"><i class="fas fa-sign-out-alt"></i> Çıkış Yap</a></li>
+        </ul>
+    </nav>
+    <button id="theme-toggle" class="theme-toggle">🌙</button>
+</header>
+
+
+<div class="container">
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="messages">
                 {% for category, message in messages %}
                     <div class="flash-message {{ category }}">{{ message }}</div>
                 {% endfor %}
-            {% endif %}
-        {% endwith %}
+            </div>
+        {% endif %}
+    {% endwith %}
 
-        <hr>
-        <h2>Yeni Ajanda Kaydı Oluştur</h2>
-        <form method="POST" action="{{ url_for('ajanda_olustur') }}">
-            <input type="text" name="ders_adi" placeholder="Ders/Sınav Adı (Örn: Matematik Final)" required>
-            <label for="tarih">Sınav Tarihi:</label>
-            <input type="date" name="tarih" id="tarih" required>
-            <textarea name="konular" placeholder="Çalışılacak Konular (Virgülle ayırarak Örn: Türev, Limit, İntegral)" rows="3" required></textarea>
-            <button type="submit">Ajanda Kaydını Ekle</button>
-        </form>
-
-        <hr>
-        <h2>Ajanda Kayıtlarım</h2>
-        <ul class="ajanda-kayitlari">
-            {% for ajanda in ajanda_listesi %}
-            <li class="kayit-item">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3>{{ ajanda.kayit.ders_adi }}</h3>
-                    <form method="POST" action="{{ url_for('kayit_sil', kayit_id=ajanda.kayit.id) }}" style="margin: 0;">
-                        <button type="submit" style="background-color: #dc3545; padding: 5px 10px;">Sil</button>
-                    </form>
+    <div class="dashboard-grid">
+        
+        <div id="ajanda-formu" class="add-form-card">
+            <h2>Yeni Ajanda Kaydı Ekle</h2>
+            <form method="POST" action="{{ url_for('ajanda_olustur') }}">
+                
+                <div class="form-group">
+                    <label for="ders_adi">Ders Adı</label>
+                    <input type="text" id="ders_adi" name="ders_adi" placeholder="Örn: Yapay Zeka" required>
                 </div>
                 
-                <p><strong>Tarih:</strong> {{ ajanda.kayit.tarih.strftime('%d.%m.%Y') }}</p>
-                <p><strong>Konular:</strong> {{ ajanda.kayit.konular }}</p>
-                <p>
-                    <strong>Kalan Süre:</strong> 
-                    {% if ajanda.kalan_gun >= 0 %}
-                        {{ ajanda.kalan_gun }} gün kaldı
-                    {% else %}
-                        {{ ajanda.kalan_gun * -1 }} gün önceydi
-                    {% endif %}
-                </p>
-
-                <p>
-                    <span class="kalan-gun-etiketi {% if ajanda.kalan_gun <= 3 and ajanda.kalan_gun >= 0 %}kritik{% elif ajanda.kalan_gun <= 7 and ajanda.kalan_gun > 3 %}yogun{% elif ajanda.kalan_gun < 0 %}gecti{% else %}planli{% endif %}">
-                        {{ ajanda.plan_etiketi }}
-                    </span>
-                </p>
-
-                {% if ajanda.video_listesi %}
-                <div class="video-list">
-                    <h4>Önerilen YouTube Kaynakları:</h4>
-                    <ul>
-                        {% for video in ajanda.video_listesi %}
-                            <li><a href="https://www.youtube.com/watch?v={{ video.video_id }}" target="_blank">{{ video.title }}</a></li>
-                        {% endfor %}
-                    </ul>
+                <div class="form-group">
+                    <label for="tarih">Tarih</label>
+                    <input type="date" id="tarih" name="tarih" required>
                 </div>
-                {% endif %}
-            </li>
-            {% endfor %}
-        </ul>
+                
+                <div class="form-group">
+                    <label for="etiket">Etiket (Kritik/Yoğun/Planlı)</label>
+                    <input type="text" id="etiket" name="etiket" placeholder="Örn: Kritik" required>
+                </div>
+                
+                <div class="form-group" style="grid-column: 1 / 4;">
+                    <label for="konular">Konu/Açıklama (veya YouTube Arama Sorgusu)</label>
+                    <textarea id="konular" name="konular" rows="3" placeholder="Örn: Derin Öğrenme Mimarileri veya 'Deep Learning Architectures YouTube'"></textarea>
+                </div>
+
+                <button type="submit">Kaydı Ekle & Video Ara</button>
+            </form>
+        </div>
+
+        
+        {% if kayitlar %}
+            <ul class="ajanda-listesi">
+                {% for kayit in kayitlar %}
+                    <li class="ajanda-item">
+                        
+                        <div class="item-details">
+                            <h3>{{ kayit.ders_adi }}</h3>
+                            <p>{{ kayit.konular }}</p>
+                        </div>
+                        
+                        <div class="item-date">
+                            {{ kayit.tarih.strftime('%d.%m.%Y') }}
+                        </div>
+
+                        <div class="item-etiket">
+                            <span class="etiket {{ kayit.etiket.lower() }}">
+                                {{ kayit.etiket }}
+                            </span>
+                        </div>
+                        
+                        <form method="POST" action="{{ url_for('kayit_sil', kayit_id=kayit.id) }}" class="delete-form">
+                            <button type="submit" onclick="return confirm('Bu kaydı silmek istediğinizden emin misiniz?');">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </form>
+                        
+                        {% if kayit.video_sonuc and kayit.video_sonuc|length > 2 %}
+                            <div class="video-sonuclari">
+                                <h4>YouTube Arama Sonuçları:</h4>
+                                <ul class="video-list">
+                                    {% for video in kayit.video_sonuc.split('|||') %}
+                                        {% set parts = video.split(':::') %}
+                                        {% if parts|length == 2 %}
+                                            <li class="video-item">
+                                                <a href="{{ parts[1] }}" target="_blank" title="{{ parts[0] }}">
+                                                    {{ parts[0] }}
+                                                </a>
+                                            </li>
+                                        {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <div class="auth-card" style="margin-top: 20px;">
+                <p>Henüz ajandana eklenmiş bir kaydın yok. Yeni bir ders veya sınav kaydı ekleyerek başla!</p>
+            </div>
+        {% endif %}
     </div>
+</div>
+
+<script>
+    // ------------------- TEMA DEĞİŞTİRME JS -------------------
+    const themeToggle = document.getElementById('theme-toggle');
+    const body = document.body;
+    
+    // 1. Tercihi Yükle (Sayfa açıldığında)
+    const currentTheme = localStorage.getItem('theme');
+    if (currentTheme === 'dark') {
+        body.classList.add('dark-mode');
+        themeToggle.textContent = '☀️'; // Güneş ikonunu göster
+    } else {
+        themeToggle.textContent = '🌙'; // Ay ikonunu göster
+    }
+
+    // 2. Buton Tıklama İşlemi
+    themeToggle.addEventListener('click', () => {
+        body.classList.toggle('dark-mode');
+        
+        let theme = body.classList.contains('dark-mode') ? 'dark' : 'light';
+        localStorage.setItem('theme', theme);
+        
+        themeToggle.textContent = (theme === 'dark') ? '☀️' : '🌙';
+    });
+
+    // ------------------- HAMBURGER MENÜ JS -------------------
+    const hamburgerToggle = document.getElementById('hamburger-toggle');
+    const navMenu = document.getElementById('nav-menu');
+
+    hamburgerToggle.addEventListener('click', () => {
+        navMenu.classList.toggle('active');
+    });
+    
+    // Menü dışına tıklandığında veya linke basıldığında menüyü kapat
+    document.addEventListener('click', (event) => {
+        if (!navMenu.contains(event.target) && !hamburgerToggle.contains(event.target)) {
+            navMenu.classList.remove('active');
+        }
+    });
+
+    // Linklere tıklandığında menüyü kapat (Mobil kullanım kolaylığı)
+    const navLinks = document.querySelectorAll('.nav-links a');
+    navLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            navMenu.classList.remove('active');
+        });
+    });
+    
+</script>
+
 </body>
 </html>
