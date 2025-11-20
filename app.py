@@ -7,7 +7,7 @@ import os
 from googleapiclient.discovery import build
 from werkzeug.security import generate_password_hash, check_password_hash
 import tempfile 
-from flask_session import Session # 🚨 CRITICAL: Bu kütüphanenin kurulu olduğundan emin ol!
+from flask_session import Session 
 import json
 import random
 
@@ -19,6 +19,7 @@ app = Flask(__name__)
 # --- UYGULAMA YAPILANDIRMASI (VERİ TABANI VE GİZLİ ANAHTAR) ---
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 
+# PostgreSQL uyumluluğu için düzeltme
 if app.config['SQLALCHEMY_DATABASE_URI'] and app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace("postgres://", "postgresql://", 1)
 
@@ -28,7 +29,7 @@ if not app.config['SQLALCHEMY_DATABASE_URI']:
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'cok_gizli_bir_anahtar') 
 
-# 💡 SESSION AYARLARI (Render ortamında dosya sistemi üzerinden çalışır)
+# SESSION AYARLARI
 app.config['SESSION_TYPE'] = 'filesystem' 
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_FILE_DIR'] = tempfile.gettempdir()
@@ -44,15 +45,14 @@ class Kullanici(UserMixin, db.Model):
     eposta = db.Column(db.String(255), unique=True, nullable=False) 
     parola_hash = db.Column(db.String(512))
     kayitlar = db.relationship('Kayit', backref='yazar', lazy=True)
-    # YENİ ALANLAR: PROGRAM OLUŞTURUCU İÇİN
-    calisma_saatleri_json = db.Column(db.Text, default='{}') # Boş zamanları tutar
-    okul_saatleri = db.Column(db.String(50), default='08:00-17:00') # Okul/Çalışma saatleri
+    calisma_saatleri_json = db.Column(db.Text, default='{}') 
+    okul_saatleri = db.Column(db.String(50), default='08:00-17:00') 
 
     def set_password(self, parola):
         self.parola_hash = generate_password_hash(parola)
 
     def check_password(self, parola):
-        return check_password_hash(parola, self.parola_hash)
+        return check_password_hash(self.parola_hash, parola)
 
 class Kayit(db.Model):
     __tablename__ = 'kayit'
@@ -69,19 +69,19 @@ class ProgramGorev(db.Model):
     __tablename__ = 'program_gorev'
     id = db.Column(db.Integer, primary_key=True)
     kullanici_id = db.Column(db.Integer, db.ForeignKey('kullanici.id'), nullable=False)
-    kayit_id = db.Column(db.Integer, db.ForeignKey('kayit.id')) # Hangi kayda ait
+    kayit_id = db.Column(db.Integer, db.ForeignKey('kayit.id'))
     gorev_tarihi = db.Column(db.Date, nullable=False)
     baslangic_saati = db.Column(db.Time, nullable=False)
     bitis_saati = db.Column(db.Time, nullable=False)
     gorev_adi = db.Column(db.String(200), nullable=False)
     tamamlandi = db.Column(db.Boolean, default=False)
-    gorev_sirasi = db.Column(db.Integer, default=0) # Program içinde görev önceliği
+    gorev_sirasi = db.Column(db.Integer, default=0)
     
-# --- TABLOLARI OLUŞTURMA İŞLEVİ (Düzeltildi) ---
+# --- TABLOLARI OLUŞTURMA İŞLEVİ ---
 def create_tables(uygulama):
     with uygulama.app_context():
         try:
-            # db.drop_all() kaldırıldı. Sadece tablo yoksa oluşturur.
+            # db.drop_all() KALDIRILMIŞTIR. Yalnızca yeni tabloları oluşturur.
             db.create_all()
             print("INFO: Veritabanı tabloları başarıyla oluşturuldu/güncellendi.") 
         except Exception as e:
@@ -121,15 +121,12 @@ def youtube_arama(arama_sorgusu):
     except Exception:
         return ""
 
-# --- YENİ: PROGRAM OLUŞTURMA ALGORİTMASI ---
+# --- PROGRAM OLUŞTURMA ALGORİTMASI ---
 def program_olustur_algo(kullanici_id):
     kullanici = Kullanici.query.get(kullanici_id)
     if not kullanici: return False
 
-    # 1. VERİLERİ ÇEK VE ÖNCELİKLENDİR
     bugun = date.today()
-    
-    # 7 gün sonrası ve en az 1 gün kalmış kayıtları al (0 gün kalanı programlamaya gerek yok)
     bitis_tarihi = bugun + timedelta(days=7) 
     yaklasan_kayitlar = Kayit.query.filter(
         Kayit.kullanici_id == kullanici_id,
@@ -139,73 +136,51 @@ def program_olustur_algo(kullanici_id):
     
     if not yaklasan_kayitlar: return False 
 
-    # Önceki programı temizle (Yeniden oluşturuyoruz)
     ProgramGorev.query.filter_by(kullanici_id=kullanici_id).delete()
     db.session.commit()
 
-    # Boş zamanları ve okul saatlerini yükle
     try:
         bos_saatler = json.loads(kullanici.calisma_saatleri_json)
     except:
         bos_saatler = {}
     
-    # Okul saatlerini parse et
     try:
         okul_bas_str, okul_bit_str = kullanici.okul_saatleri.split('-')
         okul_bas = time.fromisoformat(okul_bas_str)
         okul_bit = time.fromisoformat(okul_bit_str)
     except:
-        # Varsayılan okul saatleri
         okul_bas = time(8, 0)
         okul_bit = time(17, 0)
 
     gunler = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar']
     gorev_sirasi = 0
     
-    # 2. GÖREV HAVUZU OLUŞTUR
     gorev_havuzu = []
     
     for kayit in yaklasan_kayitlar:
         kalan_gun = (kayit.tarih.date() - bugun).days
         
-        # Çalışma Süresi Belirleme (Önceliklendirme)
         if kalan_gun <= 2:
-            suresi = 3 * 60 # 3 saat kritik çalışma
+            suresi = 3 * 60 
             zorluk = "KRİTİK"
         elif kalan_gun <= 4:
-            suresi = 2 * 60 # 2 saat yoğun çalışma
+            suresi = 2 * 60 
             zorluk = "YOĞUN"
         else:
-            suresi = 1 * 60 # 1 saat planlı çalışma
+            suresi = 1 * 60 
             zorluk = "PLANLI"
 
-        # Görevleri parçala (Konu anlatım %60, Soru çöz %40)
         konu_suresi = int(suresi * 0.6)
         soru_suresi = int(suresi * 0.4)
         
-        gorev_havuzu.append({
-            'kayit_id': kayit.id,
-            'kayit': kayit,
-            'suresi': konu_suresi,
-            'tip': 'Konu Anlatımı/Video İzle',
-            'zorluk': zorluk
-        })
-        gorev_havuzu.append({
-            'kayit_id': kayit.id,
-            'kayit': kayit,
-            'suresi': soru_suresi,
-            'tip': 'Soru Çözme/Tekrar',
-            'zorluk': zorluk
-        })
+        gorev_havuzu.append({'kayit_id': kayit.id, 'kayit': kayit, 'suresi': konu_suresi, 'tip': 'Konu Anlatımı/Video İzle', 'zorluk': zorluk})
+        gorev_havuzu.append({'kayit_id': kayit.id, 'kayit': kayit, 'suresi': soru_suresi, 'tip': 'Soru Çözme/Tekrar', 'zorluk': zorluk})
     
-    # KRİTİK görevler öncelikli olsun
     gorev_havuzu.sort(key=lambda x: x['zorluk'], reverse=True)
 
-
-    # 3. ZAMANA GÖRE GÖREVLERİ DAĞIT
     for i in range(7):
         suanki_tarih = bugun + timedelta(days=i)
-        gun_adi = gunler[suanki_tarih.weekday()] # 0=Pazartesi
+        gun_adi = gunler[suanki_tarih.weekday()]
 
         if gun_adi in bos_saatler:
             try:
@@ -214,32 +189,23 @@ def program_olustur_algo(kullanici_id):
                 calisma_baslangici = datetime.combine(suanki_tarih, time.fromisoformat(bos_bas_str))
                 calisma_bitisi = datetime.combine(suanki_tarih, time.fromisoformat(bos_bit_str))
                 
-                # Okul/Sınırlı saatleri kontrol et
                 okul_baslangic_dt = datetime.combine(suanki_tarih, okul_bas)
                 okul_bitis_dt = datetime.combine(suanki_tarih, okul_bit)
                 
-                # Okul saatleri içindeki boş zamanları atla (Bu aralığı çalışma başlangıcı yap)
+                # Okul saatlerini atla
                 if calisma_baslangici < okul_bitis_dt and calisma_bitisi > okul_baslangic_dt:
                     if calisma_baslangici < okul_baslangic_dt and calisma_bitisi > okul_bitis_dt:
-                        # Boş zaman okul öncesi ve sonrası kapsıyorsa, okul bitişini başlangıç yap
                         calisma_baslangici = okul_bitis_dt
                     elif calisma_baslangici >= okul_baslangic_dt and calisma_bitisi <= okul_bitis_dt:
-                        # Boş zaman tamamen okul içinde, bu günü atla
                         continue 
-                    elif calisma_baslangici < okul_baslangic_dt:
-                        # Boş zaman okul başlangıcında bitiyor, sorun yok
-                        pass
                     elif calisma_baslangici < okul_bitis_dt:
-                         # Boş zaman okul bitişine denk geliyor, başlangıcı okul bitişine taşı
                         calisma_baslangici = okul_bitis_dt
-
 
                 suanki_zaman = calisma_baslangici
                 
-                # Çalışma periyotları (2 saatlik bloklar, 10 dk mola)
                 while suanki_zaman < calisma_bitisi and gorev_havuzu:
                     
-                    gorev = gorev_havuzu.pop(0) # En öncelikli görevi al
+                    gorev = gorev_havuzu.pop(0)
                     gorev_suresi_td = timedelta(minutes=gorev['suresi'])
                     gorev_bitis_zamani = suanki_zaman + gorev_suresi_td
                     
@@ -255,20 +221,27 @@ def program_olustur_algo(kullanici_id):
                             gorev_sirasi=gorev_sirasi
                         )
                         db.session.add(yeni_gorev)
-                        suanki_zaman = gorev_bitis_zamani + timedelta(minutes=15) # 15 dakika mola
+                        suanki_zaman = gorev_bitis_zamani + timedelta(minutes=15)
                     else:
-                        # Bu görev bu blokta bitmiyor, geri koy ve döngüyü kır
                         gorev_havuzu.insert(0, gorev)
                         break
 
             except Exception:
-                continue # Hatalı format varsa bu günü atla
+                continue 
     
     db.session.commit()
     return True
 
 
 # --- ROTALAR ---
+
+@app.route('/')
+def ana_sayfa_yonlendirme():
+    # 🚨 404 HATASI DÜZELTME ROTASI
+    if not current_user.is_authenticated:
+        return redirect(url_for('giris'))
+    return redirect(url_for('index'))
+
 
 @app.route('/giris', methods=['GET', 'POST'])
 def giris():
@@ -386,7 +359,6 @@ def kayit_sil(kayit_id):
     
     if kayit:
         try:
-            # İlgili program görevlerini de sil
             ProgramGorev.query.filter_by(kayit_id=kayit_id).delete()
             db.session.delete(kayit)
             db.session.commit()
@@ -406,7 +378,6 @@ def ayarlar():
     
     if request.method == 'POST':
         if 'kullanici_adi' in request.form:
-            # 1. Kullanıcı Adı Güncelleme
             yeni_ad = request.form.get('kullanici_adi')
             if yeni_ad:
                 try:
@@ -420,12 +391,10 @@ def ayarlar():
                     db.session.rollback(); flash(f'Adınız güncellenirken bir hata oluştu: {e}', 'danger')
         
         elif 'okul_saatleri' in request.form:
-            # 2. Program Ayarları Güncelleme
             okul_saatleri = request.form.get('okul_saatleri')
             gunler = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar']
             bos_saatleri_dict = {}
 
-            # Gün bazlı boş zamanları topla
             for gun in gunler:
                 bos_saat = request.form.get(gun)
                 if bos_saat:
@@ -441,7 +410,6 @@ def ayarlar():
         
         return redirect(url_for('ayarlar'))
 
-    # GET isteği
     mevcut_bos_saatler = json.loads(kullanici.calisma_saatleri_json or '{}')
     
     return render_template(
@@ -457,11 +425,9 @@ def program():
     
     program_verisi = {}
     for gorev in gorevler:
-        # Tarih formatını kontrol et ve string'e çevir
         if isinstance(gorev.gorev_tarihi, date):
             tarih_str = gorev.gorev_tarihi.strftime('%Y-%m-%d')
         else:
-            # Hata durumunda bugün tarihini kullan
             tarih_str = date.today().strftime('%Y-%m-%d')
             
         if tarih_str not in program_verisi:
@@ -491,17 +457,14 @@ def program_olustur():
 def program_guncelle(gorev_id):
     gorev = ProgramGorev.query.filter_by(id=gorev_id, kullanici_id=current_user.id).first()
     if gorev:
-        # Checkbox değeri sadece varsa 'on' döner. Eğer formda yoksa (işaret kaldırılmışsa) False yapılır.
         tamamlandi = request.form.get('tamamlandi') == 'on' 
         gorev.tamamlandi = tamamlandi
         try:
             db.session.commit()
-            # flash(f"'{gorev.gorev_adi}' görevinin durumu güncellendi.", 'info') # Çok fazla bildirim kirliliğini önlemek için kaldırıldı.
         except:
             db.session.rollback()
             flash('Görev durumu güncellenirken bir hata oluştu.', 'danger')
     
-    # AJAX olmadığı için kullanıcıyı program sayfasına geri yönlendir
     return redirect(url_for('program'))
 
 
