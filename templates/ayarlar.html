@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ayarlar - Profil</title>
+    <title>Ayarlar - Profil ve Program</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
@@ -20,6 +20,7 @@
         <ul class="nav-links" id="nav-menu">
             <li><a href="{{ url_for('index') }}"><i class="fas fa-star"></i> Ajandam</a></li>
             <li><a href="{{ url_for('ekle') }}"><i class="fas fa-plus-circle"></i> Ders/Sınav Ekle</a></li>
+            <li><a href="{{ url_for('program') }}"><i class="fas fa-calendar-check"></i> Programım</a></li> 
             <li><a href="{{ url_for('ayarlar') }}"><i class="fas fa-cog"></i> Ayarlar</a></li> 
             <li><a href="{{ url_for('cikis') }}"><i class="fas fa-sign-out-alt"></i> Çıkış Yap</a></li>
         </ul>
@@ -39,7 +40,7 @@
         {% endif %}
     {% endwith %}
 
-    <div class="auth-card" style="max-width: 600px; margin: 40px auto;">
+    <div class="auth-card" style="max-width: 600px; margin: 40px auto; padding: 40px;">
         <h2><i class="fas fa-user-cog"></i> Profil Ayarları</h2>
 
         <div class="form-group" style="margin-bottom: 30px;">
@@ -49,16 +50,45 @@
         
         <div class="form-group" style="margin-bottom: 40px;">
             <label>E-posta Adresiniz:</label>
-            <p style="font-size: 1rem; color: var(--text-light);">{{ current_user.eposta }} (Değiştirilemez)</p>
+            <p style="font-size: 1rem; color: var(--text-light);">{{ current_user.eposta }}</p>
         </div>
 
-        <form method="POST" action="{{ url_for('ayarlar') }}">
-            
+        <form method="POST" action="{{ url_for('ayarlar') }}" style="border-bottom: 1px solid var(--border-color); padding-bottom: 30px; margin-bottom: 30px;">
             <label for="kullanici_adi">Kullanıcı Adını Değiştir</label>
             <input type="text" id="kullanici_adi" name="kullanici_adi" 
                    placeholder="Yeni Kullanıcı Adı (Örn: Gemini)" required>
             
             <button type="submit"><i class="fas fa-pen-fancy"></i> Adı Güncelle</button>
+        </form>
+
+        <h2><i class="fas fa-clock"></i> Programlama Saatleri</h2>
+        <p class="text-light" style="margin-bottom: 20px;">Lütfen okulda/işte olduğunuz (çalışamayacağınız) saatleri ve çalışabileceğiniz (boş) saatleri giriniz. Program bu saatlere göre oluşturulacaktır.</p>
+
+        <form method="POST" action="{{ url_for('ayarlar') }}">
+            
+            <div class="form-group" style="margin-bottom: 25px;">
+                <label for="okul_saatleri">Okul/İş Saatleri (Çalışılamayacak Aralığı)</label>
+                <input type="text" id="okul_saatleri" name="okul_saatleri" 
+                       value="{{ mevcut_okul_saatleri }}"
+                       placeholder="Örn: 08:00-17:00" required>
+            </div>
+            
+            <h4 style="margin-top: 25px; margin-bottom: 15px; color: var(--brand-color);">Boş Zaman Girişleri (Çalışılabilecek Aralıklar)</h4>
+
+            {% set gunler = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'] %}
+            
+            <div class="saat-grid">
+                {% for gun in gunler %}
+                <div class="form-group">
+                    <label for="{{ gun }}">{{ gun }} Boş Zamanı</label>
+                    <input type="text" id="{{ gun }}" name="{{ gun }}" 
+                           value="{{ mevcut_bos_saatler.get(gun, '') }}"
+                           placeholder="Örn: 18:00-22:00 (Boşsa boş bırakın)">
+                </div>
+                {% endfor %}
+            </div>
+            
+            <button type="submit" style="margin-top: 30px;"><i class="fas fa-save"></i> Program Saatlerini Kaydet</button>
         </form>
     </div>
 </div>
