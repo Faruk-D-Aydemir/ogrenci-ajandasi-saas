@@ -1,54 +1,45 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_login import UserMixin, login_user, LoginManager, login_required, logout_user, current_user
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, date
 from dotenv import load_dotenv 
 import os 
 from googleapiclient.discovery import build
-import json
 from werkzeug.security import generate_password_hash, check_password_hash
 import tempfile 
 from flask_session import Session 
 
-# --- ÇEVRE DEĞİŞKENLERİNİ YÜKLEME (.env) ---
 load_dotenv() 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY") 
 
 app = Flask(__name__)
 
 # --- UYGULAMA YAPILANDIRMASI (VERİ TABANI VE GİZLİ ANAHTAR) ---
-
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 
-# Render'ın verdiği URL'deki "postgres" kelimesini "postgresql" olarak düzeltir.
 if app.config['SQLALCHEMY_DATABASE_URI'] and app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace("postgres://", "postgresql://", 1)
 
-# Eğer DATABASE_URL tanımlı değilse (yerelde çalışırken) sqlite kullan.
 if not app.config['SQLALCHEMY_DATABASE_URI']:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///proje_ajandasi.db'
-
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'cok_gizli_bir_anahtar') 
 
-# >>>>>> FLASK-SESSION AYARLARI <<<<<<
 app.config['SESSION_TYPE'] = 'filesystem' 
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_FILE_DIR'] = tempfile.gettempdir()
 Session(app)
-# >>>>>> ÇÖZÜM KODUNUN SONU <<<<<<
 
 db = SQLAlchemy(app)
 
-# --- VERİ TABANI MODELLERİ (SQLALCHEMY - db.create_all'dan ÖNCE OLMALI) ---
+# --- VERİ TABANI MODELLERİ ---
 class Kullanici(UserMixin, db.Model):
-    # PostgreSQL uyumu için tablo adını küçük harf yap
     __tablename__ = 'kullanici' 
     id = db.Column(db.Integer, primary_key=True)
-    kullanici_adi = db.Column(db.String(255), unique=True, nullable=False) # Boyut 255
-    eposta = db.Column(db.String(255), unique=True, nullable=False) # Boyut 255
-    parola_hash = db.Column(db.String(512)) # <--- KRİTİK DÜZELTME: Boyut 512
+    kullanici_adi = db.Column(db.String(255), unique=True, nullable=False) 
+    eposta = db.Column(db.String(255), unique=True, nullable=False) 
+    parola_hash = db.Column(db.String(512))
     kayitlar = db.relationship('Kayit', backref='yazar', lazy=True)
 
     def set_password(self, parola):
@@ -58,35 +49,25 @@ class Kullanici(UserMixin, db.Model):
         return check_password_hash(self.parola_hash, parola)
 
 class Kayit(db.Model):
-    # PostgreSQL uyumu için tablo adını küçük harf yap
     __tablename__ = 'kayit'
     id = db.Column(db.Integer, primary_key=True)
     ders_adi = db.Column(db.String(100), nullable=False)
     tarih = db.Column(db.DateTime, nullable=False)
     konular = db.Column(db.Text, nullable=False)
+    etiket = db.Column(db.String(50)) 
     video_sonuc = db.Column(db.Text)
     eklenme_tarihi = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # ForeignKey içindeki referansı da küçük harfe çevir
     kullanici_id = db.Column(db.Integer, db.ForeignKey('kullanici.id'), nullable=False)
 
-# --- TABLOLARI GECİKME İLE OLUŞTURMA İŞLEVİ (MODELLERDEN SONRA ÇALIŞMALI) ---
 def create_tables(uygulama):
-    # Uygulama bağlamını kullanarak tablo oluşturmayı zorlar.
     with uygulama.app_context():
         try:
             db.create_all()
-            print("INFO: Veritabanı tabloları başarıyla oluşturuldu veya zaten mevcut.") 
         except Exception as e:
-            print(f"HATA: Tablo oluşturulurken bir hata oluştu: {e}")
             pass
 
-# Uygulama hazır olduğunda (run time) tabloları oluştur.
 create_tables(app)
-# ------------------------------------------------------------------------
 
-
-# --- FLASK-LOGIN YAPILANDIRMASI ---
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'giris' 
@@ -96,14 +77,11 @@ login_manager.login_message = "Bu sayfaya erişmek için lütfen giriş yapın."
 def load_user(user_id):
     return Kullanici.query.get(int(user_id))
 
-
-# --- YOUTUBE ARAMA FONKSİYONU ---
 def youtube_arama(arama_sorgusu):
     if not YOUTUBE_API_KEY or not YOUTUBE_API_KEY.strip():
-        return []
+        return ""
     try:
         youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
-        
         request = youtube.search().list(
             q=arama_sorgusu,             
             part="snippet",              
@@ -111,150 +89,110 @@ def youtube_arama(arama_sorgusu):
             type="video",                
             videoEmbeddable="true"       
         )
-        
         response = request.execute()
         
         video_listesi = []
         for item in response.get("items", []):
-            video_listesi.append({
-                'title': item['snippet']['title'],
-                'video_id': item['id']['videoId']
-            })
+            # Başlık:::Link ||| Başlık:::Link formatında döndürür
+            video_listesi.append(f"{item['snippet']['title']}:::{'https://www.youtube.com/embed/' + item['id']['videoId']}")
             
-        return video_listesi
+        return "|||".join(video_listesi)
     except Exception:
-        return []
+        return ""
 
-# --- ROTALAR (SAYFA ADRESLERİ) ---
+
+# --- ROTALAR ---
 @app.route('/giris', methods=['GET', 'POST'])
 def giris():
-    if current_user.is_authenticated:
-        return redirect(url_for('index'))
-        
+    if current_user.is_authenticated: return redirect(url_for('index'))
     if request.method == 'POST':
-        eposta = request.form.get('eposta')
-        parola = request.form.get('parola')
-        
-        try:
-            kullanici = Kullanici.query.filter_by(eposta=eposta).first()
-        except Exception as e:
-            flash(f'Veritabanı hatası: {e}', 'danger')
-            return render_template('giris.html') 
-        
+        eposta = request.form.get('eposta'); parola = request.form.get('parola')
+        try: kullanici = Kullanici.query.filter_by(eposta=eposta).first()
+        except Exception as e: flash(f'Veritabanı hatası: {e}', 'danger'); return render_template('giris.html') 
         if kullanici and kullanici.check_password(parola):
-            login_user(kullanici)
-            flash('Başarıyla giriş yaptınız!', 'success')
-            return redirect(url_for('index'))
+            login_user(kullanici); flash('Başarıyla giriş yaptınız!', 'success'); return redirect(url_for('index'))
         else:
             flash('Giriş başarısız. Lütfen e-posta ve şifrenizi kontrol edin.', 'danger')
-            
     return render_template('giris.html') 
 
 @app.route('/kayitol', methods=['GET', 'POST'])
 def kayitol():
-    if current_user.is_authenticated:
-        return redirect(url_for('index'))
-        
+    if current_user.is_authenticated: return redirect(url_for('index'))
     if request.method == 'POST':
-        kullanici_adi = request.form.get('kullanici_adi')
-        eposta = request.form.get('eposta')
-        parola = request.form.get('parola')
-        
-        # --- Form Boş Kontrolü (Eklenen Güvenlik) ---
+        kullanici_adi = request.form.get('kullanici_adi'); eposta = request.form.get('eposta'); parola = request.form.get('parola')
         if not kullanici_adi or not eposta or not parola:
-             flash('Tüm alanları doldurmanız gerekmektedir.', 'danger')
-             return redirect(url_for('kayitol'))
-        # ---------------------------------------------
-             
+             flash('Tüm alanları doldurmanız gerekmektedir.', 'danger'); return redirect(url_for('kayitol'))
         try:
-            # E-posta zaten kayıtlı mı?
             if Kullanici.query.filter_by(eposta=eposta).first():
-                flash('Bu e-posta adresi zaten kayıtlı.', 'warning')
-                return redirect(url_for('kayitol'))
-                
+                flash('Bu e-posta adresi zaten kayıtlı.', 'warning'); return redirect(url_for('kayitol'))
             yeni_kullanici = Kullanici(kullanici_adi=kullanici_adi, eposta=eposta)
             yeni_kullanici.set_password(parola)
-            
-            db.session.add(yeni_kullanici)
-            db.session.commit()
-            
+            db.session.add(yeni_kullanici); db.session.commit()
         except Exception as e:
-            # Hata durumunda veritabanı işlemini geri al
-            db.session.rollback() 
-            
-            # Hatanın ne olduğunu ekrana yazdır (CRITICAL FOR DEBUGGING)
-            print(f"KAYIT HATA LOGU: {e}") 
-            flash(f'Kayıt işlemi sırasında veritabanı hatası oluştu: {e}', 'danger')
-            return redirect(url_for('kayitol'))
-        
-        flash('Hesabınız başarıyla oluşturuldu! Lütfen giriş yapın.', 'success')
-        return redirect(url_for('giris'))
-        
+            db.session.rollback(); flash(f'Kayıt işlemi sırasında veritabanı hatası oluştu: {e}', 'danger'); return redirect(url_for('kayitol'))
+        flash('Hesabınız başarıyla oluşturuldu! Lütfen giriş yapın.', 'success'); return redirect(url_for('giris'))
     return render_template('kayitol.html') 
 
 @app.route('/cikis')
 @login_required 
 def cikis():
-    logout_user()
-    flash('Başarıyla çıkış yaptınız.', 'info')
-    return redirect(url_for('giris'))
+    logout_user(); flash('Başarıyla çıkış yaptınız.', 'info'); return redirect(url_for('giris'))
+
 
 @app.route('/')
 @login_required 
 def index():
-    bugun = datetime.now().date() 
-    
+    bugun = date.today() 
     try:
         sirali_kayitlar = Kayit.query.filter_by(kullanici_id=current_user.id).order_by(Kayit.tarih).all()
     except Exception as e:
-        flash(f'Ajanda verileri çekilirken hata oluştu: {e}', 'danger')
-        sirali_kayitlar = []
+        flash(f'Ajanda verileri çekilirken hata oluştu: {e}', 'danger'); sirali_kayitlar = []
 
     ajanda_verileri = []
     
     for kayit in sirali_kayitlar:
         tarih_obj = kayit.tarih.date()
         kalan_gun = (tarih_obj - bugun).days
-        plan_etiketi = ""
+        plan_etiketi = ""; etiket_sinifi = ""
 
+        # AI Destekli Otomatik Etiketleme Mantığı
         if kalan_gun < 0:
             plan_etiketi = "Sınav Günü Geçti 😥"
+            etiket_sinifi = "gecmis"
         elif kalan_gun <= 3:
             plan_etiketi = "🚨 KRİTİK! Hemen Başla!"
+            etiket_sinifi = "kritik"
         elif kalan_gun <= 7:
-            plan_etiketi = "🔥 Yoğun Çalışma Zamanı"
+            plan_etiketi = "🔥 YOĞUN Çalışma Zamanı"
+            etiket_sinifi = "yogun"
         else:
             plan_etiketi = "✅ Planlı İlerleme"
+            etiket_sinifi = "planli"
             
-        video_listesi_python = []
-        if kayit.video_sonuc:
-            try:
-                video_listesi_python = json.loads(kayit.video_sonuc)
-            except json.JSONDecodeError:
-                video_listesi_python = []
-
+        
         ajanda_verileri.append({
-            'kayit': kayit, 
+            'id': kayit.id,
+            'ders_adi': kayit.ders_adi,
+            'tarih': kayit.tarih,
+            'konular': kayit.konular,
+            'video_sonuc': kayit.video_sonuc,
             'kalan_gun': kalan_gun,
-            'plan_etiketi': plan_etiketi,
-            'video_listesi': video_listesi_python
+            'etiket': plan_etiketi, 
+            'etiket_sinifi': etiket_sinifi 
         })
     
-    return render_template('index.html', ajanda_listesi=ajanda_verileri)
+    return render_template('index.html', kayitlar=ajanda_verileri)
+
 
 @app.route('/ajanda-olustur', methods=['POST'])
 @login_required 
 def ajanda_olustur():
     if request.method == 'POST':
         
-        ders_adi = request.form.get('ders_adi')
-        tarih_str = request.form.get('tarih')
-        konular = request.form.get('konular')
+        ders_adi = request.form.get('ders_adi'); tarih_str = request.form.get('tarih'); konular = request.form.get('konular')
         
-        # YouTube Arama
         arama_sorgusu = f"{ders_adi} {konular.split(',')[0].strip()} konu anlatımı"
-        video_sonuclari = youtube_arama(arama_sorgusu)
-        video_json = json.dumps(video_sonuclari)
+        video_sonuclari_string = youtube_arama(arama_sorgusu)
         
         try:
             tarih_obj = datetime.strptime(tarih_str, '%Y-%m-%d')
@@ -263,17 +201,15 @@ def ajanda_olustur():
                 ders_adi=ders_adi, 
                 tarih=tarih_obj, 
                 konular=konular,
-                video_sonuc=video_json,
-                kullanici_id=current_user.id 
+                video_sonuc=video_sonuclari_string,
+                kullanici_id=current_user.id,
+                etiket="Planlı"
             )
             
-            db.session.add(yeni_kayit)
-            db.session.commit()
-            
+            db.session.add(yeni_kayit); db.session.commit()
             flash('Yeni ajanda kaydı başarıyla oluşturuldu!', 'success')
         except Exception as e:
-            db.session.rollback() # Hata durumunda rollback
-            flash(f'Kayıt oluşturulurken bir hata oluştu: {e}', 'danger')
+            db.session.rollback(); flash(f'Kayıt oluşturulurken bir hata oluştu: {e}', 'danger')
             
         return redirect(url_for('index'))
     
@@ -284,19 +220,13 @@ def ajanda_olustur():
 def kayit_sil(kayit_id):
     try:
         kayit = Kayit.query.filter_by(id=kayit_id, kullanici_id=current_user.id).first_or_404()
-        
-        db.session.delete(kayit)
-        db.session.commit()
-        
+        db.session.delete(kayit); db.session.commit()
         flash('Ajanda kaydı başarıyla silindi.', 'info')
     except Exception as e:
-        db.session.rollback() # Hata durumunda rollback
-        flash(f'Silme işlemi sırasında hata oluştu: {e}', 'danger')
-        
+        db.session.rollback(); flash(f'Silme işlemi sırasında hata oluştu: {e}', 'danger')
     return redirect(url_for('index'))
 
 
-# --- UYGULAMAYI ÇALIŞTIRMA ---
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)

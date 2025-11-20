@@ -2,17 +2,36 @@
 /* 1. GENEL RESET VE TEMEL STİL */
 /* ========================================= */
 :root {
-    /* Renk Paleti */
-    --primary-color: #3f51b5; /* Koyu Mavi - Ana Marka Rengi */
-    --secondary-color: #f5f5f5; /* Çok Açık Gri - Arka Planlar */
-    --text-color: #333; /* Koyu Gri - Ana Metin */
-    --light-text-color: #666; /* Açık Gri - İkincil Metin */
+    /* LIGHT MODE (Varsayılan) Renk Paleti */
+    --bg-primary: #f8f9fa; /* Açık Gri Arka Plan */
+    --bg-secondary: #ffffff; /* Beyaz Kartlar/İç Alanlar */
+    --text-color: #212529; /* Koyu Metin */
+    --text-light: #6c757d; /* Açık Metin */
+    --brand-color: #4a54e1; /* Ana Marka Mavi Tonu */
     --white: #ffffff;
-    --success-color: #4caf50;
-    --danger-color: #f44336;
+    --border-color: #e9ecef; /* Çok Hafif Çizgi */
+    --shadow-color: rgba(0, 0, 0, 0.08);
+
+    /* Yuvarlak Köşeler */
+    --radius-lg: 12px; 
+    --radius-md: 8px;
     
-    /* Gölgeleme */
-    --soft-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    /* Etiket Renkleri */
+    --success: #28a745;
+    --danger: #dc3545;
+    --warning: #ff9800; /* Yoğun Etiketi İçin Turuncu */
+    --info: #17a2b8;
+}
+
+/* DARK MODE Renk Paleti (body.dark-mode için) */
+.dark-mode {
+    --bg-primary: #121212; /* Koyu Siyah Arka Plan */
+    --bg-secondary: #1e1e1e; /* Koyu Gri Kartlar */
+    --text-color: #f8f9fa; /* Beyaz Metin */
+    --text-light: #adb5bd; /* Açık Gri Metin */
+    --brand-color: #6a74ff; /* Parlak Mavi Tonu */
+    --border-color: #343a40; /* Koyu Çizgi */
+    --shadow-color: rgba(255, 255, 255, 0.05);
 }
 
 * {
@@ -22,21 +41,22 @@
 }
 
 body {
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background-color: var(--secondary-color);
+    font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-primary);
     color: var(--text-color);
     line-height: 1.6;
-    padding-top: 60px; /* Sabit başlık için boşluk */
+    padding-top: 70px; /* Sabit başlık için geniş boşluk */
+    transition: background-color 0.3s, color 0.3s; /* Tema geçişi için animasyon */
 }
 
 a {
     text-decoration: none;
-    color: var(--primary-color);
+    color: var(--brand-color);
     transition: color 0.2s ease-in-out;
 }
 
 a:hover {
-    color: var(--primary-color);
+    color: var(--brand-color);
     opacity: 0.8;
 }
 
@@ -45,75 +65,107 @@ a:hover {
 /* ========================================= */
 
 .header {
-    background-color: var(--white);
-    color: var(--text-color);
+    background-color: var(--bg-secondary);
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
-    height: 60px;
-    box-shadow: var(--soft-shadow);
+    height: 70px;
+    box-shadow: 0 2px 8px var(--shadow-color);
     z-index: 1000;
-    padding: 0 20px;
+    padding: 0 30px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .logo a {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--primary-color);
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--brand-color);
 }
 
+/* Navigasyon Linkleri (Hamburger Menü İçeriği) */
 .nav-links {
     list-style: none;
     display: flex;
-    gap: 20px;
+    gap: 25px;
+    align-items: center;
 }
 
 .nav-links a {
     color: var(--text-color);
-    font-weight: 500;
-    padding: 5px 10px;
-    border-radius: 4px;
-    transition: background-color 0.3s;
+    font-weight: 600;
+    padding: 8px 15px;
+    border-radius: var(--radius-md);
+    transition: background-color 0.3s, color 0.3s;
 }
 
 .nav-links a:hover {
-    background-color: var(--secondary-color);
-    color: var(--primary-color);
+    background-color: var(--bg-primary); 
+    color: var(--brand-color);
+}
+
+/* Hamburger Menü Butonu (Mobil Görünüm İçin) */
+.hamburger-menu {
+    display: none; /* Varsayılan olarak gizli */
+    font-size: 1.8rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-color);
+    /* Masaüstünde temanın yanında yer açmak için */
+    margin-right: 20px; 
+}
+
+/* Tema Değiştirme Butonu */
+.theme-toggle {
+    background-color: var(--bg-primary);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.theme-toggle:hover {
+    background-color: var(--border-color);
 }
 
 /* ========================================= */
 /* 3. CONTAINER VE MESAJLAR */
 /* ========================================= */
 .container {
-    max-width: 1200px;
+    max-width: 1300px; /* Daha Geniş */
     margin: 40px auto;
-    padding: 0 20px;
+    padding: 0 30px;
 }
 
 .flash-message {
-    padding: 15px 20px;
-    margin-bottom: 20px;
-    border-radius: 6px;
+    padding: 15px 25px;
+    margin-bottom: 25px;
+    border-radius: var(--radius-md);
     font-weight: 500;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px var(--shadow-color);
+    opacity: 0.9;
 }
 
 .flash-message.success {
-    background-color: var(--success-color);
+    background-color: var(--success);
     color: var(--white);
 }
 
 .flash-message.danger {
-    background-color: var(--danger-color);
+    background-color: var(--danger);
     color: var(--white);
 }
 
 .flash-message.info {
-    background-color: var(--primary-color);
+    background-color: var(--brand-color);
     color: var(--white);
 }
 
@@ -122,17 +174,18 @@ a:hover {
 /* ========================================= */
 
 .auth-card {
-    background-color: var(--white);
-    padding: 40px;
-    border-radius: 8px;
-    box-shadow: var(--soft-shadow);
-    max-width: 400px;
+    background-color: var(--bg-secondary);
+    padding: 40px 50px;
+    border-radius: var(--radius-lg); /* Yuvarlak Köşe */
+    box-shadow: 0 6px 16px var(--shadow-color);
+    max-width: 450px;
     margin: 50px auto;
+    border: 1px solid var(--border-color);
 }
 
 .auth-card h2 {
-    font-size: 2rem;
-    margin-bottom: 25px;
+    font-size: 2.2rem;
+    margin-bottom: 30px;
     color: var(--text-color);
     text-align: center;
 }
@@ -141,44 +194,40 @@ a:hover {
 .auth-card input[type="email"],
 .auth-card input[type="password"] {
     width: 100%;
-    padding: 12px 15px;
-    margin-bottom: 20px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    padding: 14px 18px;
+    margin-bottom: 25px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
     font-size: 1rem;
+    background-color: var(--bg-primary);
+    color: var(--text-color);
     transition: border-color 0.3s, box-shadow 0.3s;
 }
 
 .auth-card input:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(63, 81, 181, 0.2);
+    border-color: var(--brand-color);
+    box-shadow: 0 0 0 3px rgba(74, 84, 225, 0.2);
     outline: none;
+    background-color: var(--bg-secondary);
 }
 
 .auth-card button {
     width: 100%;
-    padding: 12px;
-    background-color: var(--primary-color);
+    padding: 14px;
+    background-color: var(--brand-color);
     color: var(--white);
     border: none;
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     font-size: 1.1rem;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
-    transition: background-color 0.3s;
+    transition: background-color 0.3s, transform 0.1s;
 }
 
 .auth-card button:hover {
-    background-color: #303f9f; /* Daha koyu ton */
+    background-color: #3b45c2;
+    transform: translateY(-1px);
 }
-
-.auth-card p {
-    text-align: center;
-    margin-top: 20px;
-    font-size: 0.9rem;
-    color: var(--light-text-color);
-}
-
 
 /* ========================================= */
 /* 5. AJANDA SAYFASI (INDEX.HTML) */
@@ -187,28 +236,30 @@ a:hover {
 .dashboard-grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 30px;
+    gap: 40px;
 }
 
-/* Yeni Kayıt Ekleme Formu */
+/* Yeni Kayıt Ekleme Formu (YouTube Search Alanı Gibi) */
 .add-form-card {
-    background-color: var(--white);
-    padding: 30px;
-    border-radius: 8px;
-    box-shadow: var(--soft-shadow);
+    background-color: var(--bg-secondary);
+    padding: 35px;
+    border-radius: var(--radius-lg); /* Yuvarlak Köşe */
+    box-shadow: 0 6px 16px var(--shadow-color);
+    border: 1px solid var(--border-color);
 }
 
 .add-form-card h2 {
-    margin-bottom: 20px;
-    color: var(--primary-color);
-    border-bottom: 2px solid var(--secondary-color);
-    padding-bottom: 10px;
+    margin-bottom: 25px;
+    color: var(--brand-color);
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 15px;
+    font-size: 1.8rem;
 }
 
 .add-form-card form {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
+    grid-template-columns: repeat(4, 1fr); /* 4 sütunlu geniş layout */
+    gap: 25px;
     align-items: end;
 }
 
@@ -218,46 +269,48 @@ a:hover {
 }
 
 .form-group label {
-    margin-bottom: 5px;
-    font-weight: 500;
-    color: var(--text-color);
-    font-size: 0.9rem;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-light);
+    font-size: 0.95rem;
 }
 
 .add-form-card input,
 .add-form-card textarea {
     width: 100%;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    padding: 12px 15px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background-color: var(--bg-primary); 
+    color: var(--text-color);
     transition: border-color 0.3s;
 }
 
 .add-form-card input:focus,
 .add-form-card textarea:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(63, 81, 181, 0.2);
+    border-color: var(--brand-color);
     outline: none;
+    box-shadow: 0 0 0 3px rgba(74, 84, 225, 0.1);
 }
 
 .add-form-card textarea {
-    resize: vertical;
+    min-height: 100px;
 }
 
 .add-form-card button {
-    padding: 10px 20px;
-    background-color: var(--success-color);
+    padding: 12px 25px;
+    background-color: var(--success);
     color: var(--white);
     border: none;
-    border-radius: 4px;
-    font-weight: 600;
+    border-radius: var(--radius-md);
+    font-weight: 700;
     cursor: pointer;
     transition: background-color 0.3s;
-    grid-column: 3 / 4; /* Üçüncü sütunda başlasın */
+    grid-column: 4 / 5; /* Dördüncü sütunda başlasın */
 }
 
 .add-form-card button:hover {
-    background-color: #388e3c;
+    background-color: #1e7e34;
 }
 
 /* Ajanda Kayıt Listesi */
@@ -265,63 +318,64 @@ a:hover {
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 25px;
 }
 
 .ajanda-item {
-    background-color: var(--white);
-    padding: 25px;
-    border-radius: 8px;
-    box-shadow: var(--soft-shadow);
-    border-left: 5px solid var(--primary-color);
+    background-color: var(--bg-secondary);
+    padding: 30px;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 6px 16px var(--shadow-color);
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 50px; /* Ders/Konu, Tarih, Etiket, Silme */
-    gap: 15px;
+    grid-template-columns: 3fr 1fr 1fr 50px; 
+    gap: 20px;
     align-items: center;
+    border: 1px solid var(--border-color);
 }
 
 .item-details h3 {
-    font-size: 1.25rem;
+    font-size: 1.4rem;
     color: var(--text-color);
     margin-bottom: 5px;
 }
 
 .item-details p {
-    font-size: 0.9rem;
-    color: var(--light-text-color);
-}
-
-.item-date, .item-etiket {
     font-size: 1rem;
-    font-weight: 600;
+    color: var(--text-light);
 }
 
-/* Etiket Renkleri */
+.item-date {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-light);
+}
+
+/* Etiket Renkleri (Python'dan Gelen) */
 .etiket {
-    padding: 5px 10px;
+    padding: 6px 12px;
     border-radius: 20px;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     text-align: center;
     font-weight: 700;
 }
 
 .etiket.kritik {
-    background-color: var(--danger-color);
+    background-color: var(--danger);
     color: var(--white);
 }
 
 .etiket.yogun {
-    background-color: #ff9800; /* Turuncu */
+    background-color: var(--warning); 
     color: var(--white);
 }
 
 .etiket.planli {
-    background-color: var(--success-color);
+    background-color: var(--success);
     color: var(--white);
 }
 
 .etiket.gecmis {
-    background-color: var(--light-text-color);
+    background-color: var(--text-light);
     color: var(--white);
 }
 
@@ -329,10 +383,10 @@ a:hover {
 .delete-form button {
     background: none;
     border: none;
-    color: var(--danger-color);
+    color: var(--danger);
     cursor: pointer;
-    font-size: 1.2rem;
-    opacity: 0.7;
+    font-size: 1.4rem;
+    opacity: 0.8;
     transition: opacity 0.3s;
 }
 
@@ -342,55 +396,113 @@ a:hover {
 
 /* Video Sonuçları */
 .video-sonuclari {
-    grid-column: 1 / -1; /* Tüm sütunlara yayılsın */
-    margin-top: 15px;
-    padding-top: 15px;
-    border-top: 1px dashed var(--secondary-color);
+    grid-column: 1 / -1; 
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
 }
 
 .video-sonuclari h4 {
-    color: var(--primary-color);
-    margin-bottom: 10px;
+    color: var(--brand-color);
+    margin-bottom: 15px;
+    font-size: 1.1rem;
 }
 
 .video-list {
     list-style: none;
     display: flex;
     flex-wrap: wrap;
-    gap: 15px;
+    gap: 20px;
 }
 
 .video-item {
-    flex: 1 1 calc(33.333% - 15px);
-    background-color: var(--secondary-color);
-    padding: 10px;
-    border-radius: 6px;
-    font-size: 0.9rem;
+    flex: 1 1 calc(33.333% - 20px);
+    background-color: var(--bg-primary);
+    padding: 15px;
+    border-radius: var(--radius-md);
+    font-size: 0.95rem;
+    border: 1px solid var(--border-color);
 }
 
 .video-item a {
     font-weight: 600;
     display: block;
+    color: var(--text-color);
 }
 
+.video-item a:hover {
+    color: var(--brand-color);
+}
+
+
 /* ========================================= */
-/* 6. RESPONSIVE DÜZENLEMELER */
+/* 6. RESPONSIVE DÜZENLEMELER (Mobil Görünüm) */
 /* ========================================= */
 
-@media (max-width: 900px) {
+@media (max-width: 992px) {
+    /* Hamburger Menü Aktif */
+    .hamburger-menu {
+        display: block; 
+    }
+    
+    .header {
+        padding: 0 15px;
+    }
+
+    .nav-links {
+        /* Mobil Menüyü ekran dışına taşı */
+        position: fixed;
+        top: 70px;
+        right: 0;
+        flex-direction: column;
+        background-color: var(--bg-secondary);
+        width: 250px;
+        height: 100vh;
+        padding: 20px;
+        box-shadow: -4px 0 8px var(--shadow-color);
+        transform: translateX(100%); /* Başlangıçta gizle */
+        transition: transform 0.3s ease-in-out;
+        z-index: 999;
+    }
+    
+    .nav-links.active {
+        transform: translateX(0); /* Tıklandığında göster */
+    }
+
+    .nav-links a {
+        width: 100%;
+        text-align: left;
+        padding: 12px;
+        margin-bottom: 10px;
+        border-radius: var(--radius-md);
+    }
+    
+    /* Ajanda Ekleme Formu */
+    .add-form-card form {
+        grid-template-columns: 1fr 1fr; /* 2 sütuna düşür */
+    }
+
+    .add-form-card button {
+        grid-column: 1 / 3; /* Buton tam satıra yayılsın */
+    }
+    
+    .form-group:nth-child(4) { /* Konular alanı */
+        grid-column: 1 / 3;
+    }
+    
+    /* Ajanda Listesi */
     .ajanda-item {
-        grid-template-columns: 1fr 1fr; /* İki sütuna düşür */
+        grid-template-columns: 1fr 1fr; 
         grid-template-rows: auto auto;
-        border-left: none;
-        border-top: 5px solid var(--primary-color);
     }
     
     .item-details {
-        grid-column: 1 / 3; /* Ders ve Konu tam satıra yayılsın */
+        grid-column: 1 / 3; 
     }
 
     .item-etiket {
         grid-column: 1 / 2;
+        text-align: left;
     }
 
     .item-date {
@@ -403,34 +515,8 @@ a:hover {
         grid-row: 2 / 3;
         text-align: right;
     }
-
-    .add-form-card form {
-        grid-template-columns: 1fr; /* Tek sütuna düşür */
-    }
     
-    .add-form-card button {
-        grid-column: 1 / 2;
-    }
-
     .video-item {
         flex: 1 1 100%; /* Mobil cihazlarda videolar tam genişlikte */
-    }
-}
-
-@media (max-width: 600px) {
-    .container {
-        margin: 20px auto;
-    }
-    
-    .header {
-        padding: 0 10px;
-    }
-    
-    .nav-links {
-        gap: 10px;
-    }
-    
-    .auth-card {
-        padding: 30px 20px;
     }
 }

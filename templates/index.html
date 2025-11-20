@@ -52,13 +52,8 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="tarih">Tarih</label>
+                    <label for="tarih">Sınav/Teslim Tarihi</label>
                     <input type="date" id="tarih" name="tarih" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="etiket">Etiket (Kritik/Yoğun/Planlı)</label>
-                    <input type="text" id="etiket" name="etiket" placeholder="Örn: Kritik" required>
                 </div>
                 
                 <div class="form-group" style="grid-column: 1 / 4;">
@@ -79,6 +74,9 @@
                         <div class="item-details">
                             <h3>{{ kayit.ders_adi }}</h3>
                             <p>{{ kayit.konular }}</p>
+                            <p style="font-size: 0.9rem; color: var(--text-light);">
+                                Kalan Gün: {{ kayit.kalan_gun }}
+                            </p>
                         </div>
                         
                         <div class="item-date">
@@ -86,7 +84,7 @@
                         </div>
 
                         <div class="item-etiket">
-                            <span class="etiket {{ kayit.etiket.lower() }}">
+                            <span class="etiket {{ kayit.etiket_sinifi }}">
                                 {{ kayit.etiket }}
                             </span>
                         </div>
@@ -97,12 +95,12 @@
                             </button>
                         </form>
                         
-                        {% if kayit.video_sonuc and kayit.video_sonuc|length > 2 %}
+                        {% if kayit.video_sonuc %}
                             <div class="video-sonuclari">
-                                <h4>YouTube Arama Sonuçları:</h4>
+                                <h4>Önerilen Video Kaynakları:</h4>
                                 <ul class="video-list">
-                                    {% for video in kayit.video_sonuc.split('|||') %}
-                                        {% set parts = video.split(':::') %}
+                                    {% for video_str in kayit.video_sonuc.split('|||') %}
+                                        {% set parts = video_str.split(':::') %}
                                         {% if parts|length == 2 %}
                                             <li class="video-item">
                                                 <a href="{{ parts[1] }}" target="_blank" title="{{ parts[0] }}">
@@ -134,9 +132,9 @@
     const currentTheme = localStorage.getItem('theme');
     if (currentTheme === 'dark') {
         body.classList.add('dark-mode');
-        themeToggle.textContent = '☀️'; // Güneş ikonunu göster
+        themeToggle.textContent = '☀️';
     } else {
-        themeToggle.textContent = '🌙'; // Ay ikonunu göster
+        themeToggle.textContent = '🌙';
     }
 
     // 2. Buton Tıklama İşlemi
@@ -157,21 +155,18 @@
         navMenu.classList.toggle('active');
     });
     
-    // Menü dışına tıklandığında veya linke basıldığında menüyü kapat
     document.addEventListener('click', (event) => {
         if (!navMenu.contains(event.target) && !hamburgerToggle.contains(event.target)) {
             navMenu.classList.remove('active');
         }
     });
 
-    // Linklere tıklandığında menüyü kapat (Mobil kullanım kolaylığı)
     const navLinks = document.querySelectorAll('.nav-links a');
     navLinks.forEach(link => {
         link.addEventListener('click', () => {
             navMenu.classList.remove('active');
         });
     });
-    
 </script>
 
 </body>
