@@ -7,7 +7,7 @@ import os
 from googleapiclient.discovery import build
 from werkzeug.security import generate_password_hash, check_password_hash
 import tempfile 
-from flask_session import Session 
+from flask_session import Session # 🚨 CRITICAL: Bu kütüphanenin kurulu olduğundan emin ol!
 import json
 import random
 
@@ -28,6 +28,7 @@ if not app.config['SQLALCHEMY_DATABASE_URI']:
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'cok_gizli_bir_anahtar') 
 
+# 💡 SESSION AYARLARI (Render ortamında dosya sistemi üzerinden çalışır)
 app.config['SESSION_TYPE'] = 'filesystem' 
 app.config['SESSION_PERMANENT'] = False
 app.config['SESSION_FILE_DIR'] = tempfile.gettempdir()
@@ -51,7 +52,7 @@ class Kullanici(UserMixin, db.Model):
         self.parola_hash = generate_password_hash(parola)
 
     def check_password(self, parola):
-        return check_password_hash(self.parola_hash, parola)
+        return check_password_hash(parola, self.parola_hash)
 
 class Kayit(db.Model):
     __tablename__ = 'kayit'
@@ -76,15 +77,13 @@ class ProgramGorev(db.Model):
     tamamlandi = db.Column(db.Boolean, default=False)
     gorev_sirasi = db.Column(db.Integer, default=0) # Program içinde görev önceliği
     
-# --- TABLOLARI OLUŞTURMA İŞLEVİ ---
+# --- TABLOLARI OLUŞTURMA İŞLEVİ (Düzeltildi) ---
 def create_tables(uygulama):
     with uygulama.app_context():
         try:
-            # 🚨 HATA DÜZELTME İÇİN GEÇİCİ SIFIRLAMA
-            # Bu, "etiket" sütununu ve yeni "program_gorev" tablosunu eklemek için TÜM VERİYİ SİLER.
-            db.drop_all() 
+            # db.drop_all() kaldırıldı. Sadece tablo yoksa oluşturur.
             db.create_all()
-            print("INFO: Veritabanı tabloları başarıyla SIFIRLANDI ve oluşturuldu.") 
+            print("INFO: Veritabanı tabloları başarıyla oluşturuldu/güncellendi.") 
         except Exception as e:
             print(f"HATA: Tablo oluşturulurken bir hata oluştu: {e}")
             pass
@@ -105,7 +104,6 @@ def youtube_arama(arama_sorgusu):
     if not YOUTUBE_API_KEY or not YOUTUBE_API_KEY.strip():
         return ""
     try:
-        # (Arama mantığı aynı kalır)
         youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
         request = youtube.search().list(
             q=arama_sorgusu,             
@@ -131,7 +129,7 @@ def program_olustur_algo(kullanici_id):
     # 1. VERİLERİ ÇEK VE ÖNCELİKLENDİR
     bugun = date.today()
     
-    # 3 gün sonrası ve en az 1 gün kalmış kayıtları al (0 gün kalanı programlamaya gerek yok)
+    # 7 gün sonrası ve en az 1 gün kalmış kayıtları al (0 gün kalanı programlamaya gerek yok)
     bitis_tarihi = bugun + timedelta(days=7) 
     yaklasan_kayitlar = Kayit.query.filter(
         Kayit.kullanici_id == kullanici_id,
@@ -217,25 +215,29 @@ def program_olustur_algo(kullanici_id):
                 calisma_bitisi = datetime.combine(suanki_tarih, time.fromisoformat(bos_bit_str))
                 
                 # Okul/Sınırlı saatleri kontrol et
+                okul_baslangic_dt = datetime.combine(suanki_tarih, okul_bas)
                 okul_bitis_dt = datetime.combine(suanki_tarih, okul_bit)
                 
-                # Eğer boş zaman okuldan önce başlıyorsa, okul saatlerini atla
-                if calisma_baslangici.time() < okul_bas and calisma_bitisi.time() > okul_bas:
-                    calisma_bitisi = datetime.combine(suanki_tarih, okul_bas) # Okul başlangıcına kadar çalış
+                # Okul saatleri içindeki boş zamanları atla (Bu aralığı çalışma başlangıcı yap)
+                if calisma_baslangici < okul_bitis_dt and calisma_bitisi > okul_baslangic_dt:
+                    if calisma_baslangici < okul_baslangic_dt and calisma_bitisi > okul_bitis_dt:
+                        # Boş zaman okul öncesi ve sonrası kapsıyorsa, okul bitişini başlangıç yap
+                        calisma_baslangici = okul_bitis_dt
+                    elif calisma_baslangici >= okul_baslangic_dt and calisma_bitisi <= okul_bitis_dt:
+                        # Boş zaman tamamen okul içinde, bu günü atla
+                        continue 
+                    elif calisma_baslangici < okul_baslangic_dt:
+                        # Boş zaman okul başlangıcında bitiyor, sorun yok
+                        pass
+                    elif calisma_baslangici < okul_bitis_dt:
+                         # Boş zaman okul bitişine denk geliyor, başlangıcı okul bitişine taşı
+                        calisma_baslangici = okul_bitis_dt
 
-                # Okul sonrası çalışma
-                if calisma_baslangici.time() < okul_bit:
-                    calisma_baslangici = okul_bitis_dt # Okul bittikten sonra başla
 
                 suanki_zaman = calisma_baslangici
                 
                 # Çalışma periyotları (2 saatlik bloklar, 10 dk mola)
                 while suanki_zaman < calisma_bitisi and gorev_havuzu:
-                    
-                    if suanki_zaman < okul_bitis_dt:
-                        suanki_zaman = okul_bitis_dt # Okul sonrası başla
-                        continue
-                    
                     
                     gorev = gorev_havuzu.pop(0) # En öncelikli görevi al
                     gorev_suresi_td = timedelta(minutes=gorev['suresi'])
@@ -268,13 +270,63 @@ def program_olustur_algo(kullanici_id):
 
 # --- ROTALAR ---
 
-# ... (giris, kayitol, cikis, kayit_sil rotaları aynı kalır) ...
+@app.route('/giris', methods=['GET', 'POST'])
+def giris():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    if request.method == 'POST':
+        eposta = request.form.get('eposta')
+        parola = request.form.get('parola')
+        kullanici = Kullanici.query.filter_by(eposta=eposta).first()
+        if kullanici and kullanici.check_password(parola):
+            login_user(kullanici)
+            flash('Başarıyla giriş yaptınız!', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Hatalı e-posta veya parola.', 'danger')
+    return render_template('giris.html')
 
-@app.route('/')
+@app.route('/kayitol', methods=['GET', 'POST'])
+def kayitol():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    if request.method == 'POST':
+        kullanici_adi = request.form.get('kullanici_adi')
+        eposta = request.form.get('eposta')
+        parola = request.form.get('parola')
+
+        if Kullanici.query.filter_by(eposta=eposta).first():
+            flash('Bu e-posta adresi zaten kayıtlı.', 'danger')
+            return redirect(url_for('kayitol'))
+        
+        if Kullanici.query.filter_by(kullanici_adi=kullanici_adi).first():
+            flash('Bu kullanıcı adı zaten alınmış.', 'danger')
+            return redirect(url_for('kayitol'))
+
+        yeni_kullanici = Kullanici(kullanici_adi=kullanici_adi, eposta=eposta)
+        yeni_kullanici.set_password(parola)
+        
+        try:
+            db.session.add(yeni_kullanici)
+            db.session.commit()
+            flash('Kayıt başarıyla oluşturuldu! Şimdi giriş yapabilirsiniz.', 'success')
+            return redirect(url_for('giris'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Kayıt sırasında bir hata oluştu: {e}', 'danger')
+
+    return render_template('kayitol.html')
+
+@app.route('/cikis')
+@login_required
+def cikis():
+    logout_user()
+    flash('Başarıyla çıkış yaptınız.', 'info')
+    return redirect(url_for('giris'))
+
 @app.route('/ajanda')
 @login_required 
 def index():
-    # ... (Ajanda listesi oluşturma mantığı aynı kalır) ...
     bugun = date.today() 
     try:
         sirali_kayitlar = Kayit.query.filter_by(kullanici_id=current_user.id).order_by(Kayit.tarih).all()
@@ -308,7 +360,6 @@ def index():
 @login_required
 def ekle():
     if request.method == 'POST':
-        # ... (Kayıt oluşturma mantığı aynı kalır) ...
         ders_adi = request.form.get('ders_adi'); tarih_str = request.form.get('tarih'); konular = request.form.get('konular')
         arama_sorgusu = f"{ders_adi} {konular.split(',')[0].strip()} konu anlatımı"
         video_sonuclari_string = youtube_arama(arama_sorgusu)
@@ -328,6 +379,25 @@ def ekle():
     
     return render_template('form.html')
 
+@app.route('/kayit_sil/<int:kayit_id>', methods=['POST'])
+@login_required
+def kayit_sil(kayit_id):
+    kayit = Kayit.query.filter_by(id=kayit_id, kullanici_id=current_user.id).first()
+    
+    if kayit:
+        try:
+            # İlgili program görevlerini de sil
+            ProgramGorev.query.filter_by(kayit_id=kayit_id).delete()
+            db.session.delete(kayit)
+            db.session.commit()
+            flash(f"'{kayit.ders_adi}' kaydı başarıyla silindi.", 'info')
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Kayıt silinirken bir hata oluştu: {e}", 'danger')
+    else:
+        flash("Silinecek kayıt bulunamadı.", 'warning')
+
+    return redirect(url_for('index'))
 
 @app.route('/ayarlar', methods=['GET', 'POST'])
 @login_required
@@ -387,7 +457,13 @@ def program():
     
     program_verisi = {}
     for gorev in gorevler:
-        tarih_str = gorev.gorev_tarihi.strftime('%Y-%m-%d')
+        # Tarih formatını kontrol et ve string'e çevir
+        if isinstance(gorev.gorev_tarihi, date):
+            tarih_str = gorev.gorev_tarihi.strftime('%Y-%m-%d')
+        else:
+            # Hata durumunda bugün tarihini kullan
+            tarih_str = date.today().strftime('%Y-%m-%d')
+            
         if tarih_str not in program_verisi:
             program_verisi[tarih_str] = []
         program_verisi[tarih_str].append({
@@ -406,7 +482,7 @@ def program_olustur():
     if program_olustur_algo(current_user.id):
         flash('Çalışma programınız başarıyla oluşturuldu! Aşağıdan kontrol edebilirsiniz.', 'success')
     else:
-        flash('Yaklaşan (7 gün içinde) bir sınav kaydı bulunmadığı için program oluşturulamadı.', 'info')
+        flash('Program oluşturulamadı. Ya boş zamanlarınız tanımlı değil ya da yakın zamanda (7 gün içinde) bir sınav kaydı bulunmamaktadır.', 'info')
     
     return redirect(url_for('program'))
 
@@ -415,19 +491,19 @@ def program_olustur():
 def program_guncelle(gorev_id):
     gorev = ProgramGorev.query.filter_by(id=gorev_id, kullanici_id=current_user.id).first()
     if gorev:
-        # Checkbox değeri sadece varsa 'on' döner
+        # Checkbox değeri sadece varsa 'on' döner. Eğer formda yoksa (işaret kaldırılmışsa) False yapılır.
         tamamlandi = request.form.get('tamamlandi') == 'on' 
         gorev.tamamlandi = tamamlandi
         try:
             db.session.commit()
-            flash(f"'{gorev.gorev_adi}' görevinin durumu güncellendi.", 'info')
+            # flash(f"'{gorev.gorev_adi}' görevinin durumu güncellendi.", 'info') # Çok fazla bildirim kirliliğini önlemek için kaldırıldı.
         except:
             db.session.rollback()
             flash('Görev durumu güncellenirken bir hata oluştu.', 'danger')
     
+    # AJAX olmadığı için kullanıcıyı program sayfasına geri yönlendir
     return redirect(url_for('program'))
 
-# ... (Diğer rotalar) ...
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
