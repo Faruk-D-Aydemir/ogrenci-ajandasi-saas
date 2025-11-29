@@ -37,7 +37,7 @@ Session(app)
 
 db = SQLAlchemy(app)
 
-# --- VERİ TABANI MODELLERİ ---
+# --- VERİ TABANI MODELLERİ (YENİ ALAN EKLENDİ) ---
 class Kullanici(UserMixin, db.Model):
     __tablename__ = 'kullanici' 
     id = db.Column(db.Integer, primary_key=True)
@@ -64,6 +64,8 @@ class Kayit(db.Model):
     video_sonuc = db.Column(db.Text)
     eklenme_tarihi = db.Column(db.DateTime, default=datetime.utcnow)
     kullanici_id = db.Column(db.Integer, db.ForeignKey('kullanici.id'), nullable=False)
+    # 🌟 YENİ ALAN: NOT GİRİŞİ İÇİN
+    alinan_not = db.Column(db.Integer, nullable=True) # 0-100 arası not
 
 class ProgramGorev(db.Model):
     __tablename__ = 'program_gorev'
@@ -81,6 +83,7 @@ class ProgramGorev(db.Model):
 def create_tables(uygulama):
     with uygulama.app_context():
         try:
+            # Not sütununu eklemek için veritabanı yapısını günceller
             db.create_all()
             print("INFO: Veritabanı tabloları başarıyla oluşturuldu/güncellendi.") 
         except Exception as e:
@@ -107,6 +110,7 @@ def youtube_arama(arama_sorgusu):
         request = youtube.search().list(
             q=arama_sorgusu,             
             part="snippet",              
+            # 🌟 DÜZELTME 1: Video sonucunu 3 ile sınırla
             maxResults=3,                
             type="video",                
             videoEmbeddable="true"       
@@ -120,7 +124,7 @@ def youtube_arama(arama_sorgusu):
     except Exception:
         return ""
 
-# --- PROGRAM OLUŞTURMA ALGORİTMASI (DÜZELTİLMİŞ) ---
+# --- PROGRAM OLUŞTURMA ALGORİTMASI (DÜZELTİLDİ) ---
 def program_olustur_algo(kullanici_id):
     kullanici = Kullanici.query.get(kullanici_id)
     if not kullanici: return False
@@ -168,12 +172,14 @@ def program_olustur_algo(kullanici_id):
         else:
             suresi = 1 * 60 
             zorluk = "PLANLI"
-
+            
+        # 🌟 DÜZELTME 3: Program dağılımı (Şimdilik sabit kalır, puanlama sonrası akıllanacak)
         konu_suresi = int(suresi * 0.6)
         soru_suresi = int(suresi * 0.4)
         
-        gorev_havuzu.append({'kayit_id': kayit.id, 'kayit': kayit, 'suresi': konu_suresi, 'tip': 'Konu Anlatımı/Video İzle', 'zorluk': zorluk})
-        gorev_havuzu.append({'kayit_id': kayit.id, 'kayit': kayit, 'suresi': soru_suresi, 'tip': 'Soru Çözme/Tekrar', 'zorluk': zorluk})
+        # 🌟 YENİ TİP: Not alma uyarısı eklendi
+        gorev_havuzu.append({'kayit_id': kayit.id, 'kayit': kayit, 'suresi': konu_suresi, 'tip': 'Konu Anlatımı (Not Çıkararak) ✍️', 'zorluk': zorluk})
+        gorev_havuzu.append({'kayit_id': kayit.id, 'kayit': kayit, 'suresi': soru_suresi, 'tip': 'Soru Çözme/Tekrar 🧠', 'zorluk': zorluk})
     
     gorev_havuzu.sort(key=lambda x: x['zorluk'], reverse=True)
 
@@ -192,26 +198,18 @@ def program_olustur_algo(kullanici_id):
                 okul_baslangic_dt = datetime.combine(suanki_tarih, okul_bas)
                 okul_bitis_dt = datetime.combine(suanki_tarih, okul_bit)
                 
-                # --- 🛠️ DÜZELTİLMİŞ OKUL SAATLERİ ATLATMA MANTIĞI ---
-                
-                # Eğer boş zaman okul saatleriyle çakışıyorsa (Okul sonrası çalışmaya başla veya atla)
+                # Çakışma kontrolü (Basitleştirilmiş Mantık)
                 if calisma_baslangici < okul_bitis_dt and calisma_bitisi > okul_baslangic_dt:
                     
                     if calisma_baslangici >= okul_bitis_dt:
-                        # Eğer boş zaman okul bittikten sonra başlıyorsa sorun yok
                         pass 
                     elif calisma_baslangici < okul_bitis_dt and calisma_bitisi > okul_bitis_dt:
-                        # Boş zaman okul saatleri içinde başlıyor, başlangıcı okul bitişine taşı
                         calisma_baslangici = okul_bitis_dt
                     elif calisma_baslangici < okul_baslangic_dt and calisma_bitisi > okul_bitis_dt:
-                        # Boş zaman okul öncesi ve sonrası kapsıyorsa, başlangıcı okul bitişine taşı (Okul sonrası çalış)
                         calisma_baslangici = okul_bitis_dt 
                     elif calisma_baslangici >= okul_baslangic_dt and calisma_bitisi <= okul_bitis_dt:
-                        # Boş zaman tamamen okul içinde, bu günü ATLA
                         continue 
                 
-                # ----------------------------------------------------
-
                 suanki_zaman = calisma_baslangici
                 
                 while suanki_zaman < calisma_bitisi and gorev_havuzu:
@@ -232,6 +230,7 @@ def program_olustur_algo(kullanici_id):
                             gorev_sirasi=gorev_sirasi
                         )
                         db.session.add(yeni_gorev)
+                        # 15 dakika mola
                         suanki_zaman = gorev_bitis_zamani + timedelta(minutes=15)
                     else:
                         gorev_havuzu.insert(0, gorev)
@@ -248,7 +247,6 @@ def program_olustur_algo(kullanici_id):
 
 @app.route('/')
 def ana_sayfa_yonlendirme():
-    # 404 HATASI DÜZELTME ROTASI
     if not current_user.is_authenticated:
         return redirect(url_for('giris'))
     return redirect(url_for('index'))
@@ -334,7 +332,8 @@ def index():
             
         ajanda_verileri.append({
             'id': kayit.id, 'ders_adi': kayit.ders_adi, 'tarih': kayit.tarih, 'konular': kayit.konular,
-            'video_sonuc': kayit.video_sonuc, 'kalan_gun': kalan_gun, 'etiket': plan_etiketi, 'etiket_sinifi': etiket_sinifi 
+            'video_sonuc': kayit.video_sonuc, 'kalan_gun': kalan_gun, 'etiket': plan_etiketi, 'etiket_sinifi': etiket_sinifi,
+            'alinan_not': kayit.alinan_not # Yeni notu ekledik
         })
     
     return render_template('list.html', kayitlar=ajanda_verileri)
@@ -381,6 +380,29 @@ def kayit_sil(kayit_id):
         flash("Silinecek kayıt bulunamadı.", 'warning')
 
     return redirect(url_for('index'))
+
+# 🌟 YENİ ROTA: Not Girişi
+@app.route('/not_gir/<int:kayit_id>', methods=['GET', 'POST'])
+@login_required
+def not_gir(kayit_id):
+    kayit = Kayit.query.filter_by(id=kayit_id, kullanici_id=current_user.id).first_or_404()
+    
+    if request.method == 'POST':
+        alinan_not = request.form.get('alinan_not')
+        try:
+            not_int = int(alinan_not)
+            if 0 <= not_int <= 100:
+                kayit.alinan_not = not_int
+                db.session.commit()
+                flash(f"'{kayit.ders_adi}' sınavının notu ({not_int}) başarıyla kaydedildi.", 'success')
+                return redirect(url_for('index'))
+            else:
+                flash('Not 0 ile 100 arasında olmalıdır.', 'danger')
+        except ValueError:
+            flash('Lütfen geçerli bir sayı girin.', 'danger')
+
+    return render_template('not_giris.html', kayit=kayit)
+
 
 @app.route('/ayarlar', methods=['GET', 'POST'])
 @login_required
@@ -457,7 +479,7 @@ def program():
 @login_required
 def program_olustur():
     if program_olustur_algo(current_user.id):
-        flash('Çalışma programınız başarıyla oluşturuldu! Aşağıdan kontrol edebilirsiniz.', 'success')
+        flash('Çalışma programınız başarıyla oluşturuldu! Aşağıdan kontrol edebilirsiniz. (Not: Programınızda yeterli boşluk bulunamazsa, bazı günler boş kalabilir.)', 'success')
     else:
         flash('Program oluşturulamadı. Ya boş zamanlarınız tanımlı değil ya da yakın zamanda (7 gün içinde) bir sınav kaydı bulunmamaktadır.', 'info')
     
