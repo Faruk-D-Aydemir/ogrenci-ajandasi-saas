@@ -13,7 +13,6 @@ import random
 
 load_dotenv() 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY") 
-# Önceki versiyondaki APIKEY yerine YOUTUBE_API_KEY kullanıldı. Eğer Render'da farklıysa düzeltin.
 
 app = Flask(__name__)
 
@@ -38,7 +37,7 @@ Session(app)
 
 db = SQLAlchemy(app)
 
-# --- VERİ TABANI MODELLERİ ---
+# --- VERİ TABANI MODELLERİ (Bunları dokunmuyoruz) ---
 class Kullanici(UserMixin, db.Model):
     __tablename__ = 'kullanici' 
     id = db.Column(db.Integer, primary_key=True)
@@ -65,8 +64,7 @@ class Kayit(db.Model):
     video_sonuc = db.Column(db.Text)
     eklenme_tarihi = db.Column(db.DateTime, default=datetime.utcnow)
     kullanici_id = db.Column(db.Integer, db.ForeignKey('kullanici.id'), nullable=False)
-    # Not Girişi için yeni sütun
-    alinan_not = db.Column(db.Integer, nullable=True) # 0-100 arası not
+    alinan_not = db.Column(db.Integer, nullable=True) 
 
 class ProgramGorev(db.Model):
     __tablename__ = 'program_gorev'
@@ -80,15 +78,11 @@ class ProgramGorev(db.Model):
     tamamlandi = db.Column(db.Boolean, default=False)
     gorev_sirasi = db.Column(db.Integer, default=0)
     
-# --- TABLOLARI OLUŞTURMA İŞLEVİ (Fonksiyon olarak tutuldu) ---
-# Sadece db.create_all() çağrısını kolaylaştırmak için burada kaldı.
-def create_tables(uygulama):
-    # Bu fonksiyon artık alt kısımda çağrıldığı için içerisi boşaltıldı.
-    pass 
+# Not: Veritabanı tablolarını oluşturma (db.create_all()) kodunu KALDIRDIK.
+# Bu komutu Gunicorn'a çalıştırmak yerine, veritabanını manuel olarak başlatacağız.
 
-# create_tables(app) çağrısı kaldırıldı.
+# --- FLASK-LOGIN VE DİĞER FONKSİYONLAR (Aynı Kaldı) ---
 
-# --- FLASK-LOGIN YAPILANDIRMASI ---
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'giris' 
@@ -104,23 +98,17 @@ def youtube_arama(arama_sorgusu):
     try:
         youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
         request = youtube.search().list(
-            q=arama_sorgusu,             
-            part="snippet",              
-            # Video sonucu 3 ile sınırlandı
-            maxResults=3,                
-            type="video",                
-            videoEmbeddable="true"       
+            q=arama_sorgusu, part="snippet", maxResults=3, type="video", videoEmbeddable="true"
         )
         response = request.execute()
         video_listesi = []
         for item in response.get("items", []):
             video_listesi.append(f"{item['snippet']['title']}:::{'https://www.youtube.com/embed/' + item['id']['videoId']}")
-            
         return "|||".join(video_listesi)
     except Exception:
         return ""
 
-# --- PROGRAM OLUŞTURMA ALGORİTMASI ---
+# (program_olustur_algo fonksiyonu buraya kopyalanır, aynı kalır)
 def program_olustur_algo(kullanici_id):
     kullanici = Kullanici.query.get(kullanici_id)
     if not kullanici: return False
@@ -172,7 +160,6 @@ def program_olustur_algo(kullanici_id):
         konu_suresi = int(suresi * 0.6)
         soru_suresi = int(suresi * 0.4)
         
-        # Görev adı güncellendi (Not alma uyarısı)
         gorev_havuzu.append({'kayit_id': kayit.id, 'kayit': kayit, 'suresi': konu_suresi, 'tip': 'Konu Anlatımı (Not Çıkararak) ✍️', 'zorluk': zorluk})
         gorev_havuzu.append({'kayit_id': kayit.id, 'kayit': kayit, 'suresi': soru_suresi, 'tip': 'Soru Çözme/Tekrar 🧠', 'zorluk': zorluk})
     
@@ -196,14 +183,10 @@ def program_olustur_algo(kullanici_id):
                 # Çakışma kontrolü (Stabil hale getirildi)
                 if calisma_baslangici < okul_bitis_dt and calisma_bitisi > okul_baslangic_dt:
                     
-                    if calisma_baslangici >= okul_bitis_dt:
-                        pass 
-                    elif calisma_baslangici < okul_bitis_dt and calisma_bitisi > okul_bitis_dt:
-                        calisma_baslangici = okul_bitis_dt
-                    elif calisma_baslangici < okul_baslangic_dt and calisma_bitisi > okul_bitis_dt:
-                        calisma_baslangici = okul_bitis_dt 
-                    elif calisma_baslangici >= okul_baslangic_dt and calisma_bitisi <= okul_bitis_dt:
-                        continue 
+                    if calisma_baslangici >= okul_bitis_dt: pass 
+                    elif calisma_baslangici < okul_bitis_dt and calisma_bitisi > okul_bitis_dt: calisma_baslangici = okul_bitis_dt
+                    elif calisma_baslangici < okul_baslangic_dt and calisma_bitisi > okul_bitis_dt: calisma_baslangici = okul_bitis_dt 
+                    elif calisma_baslangici >= okul_baslangic_dt and calisma_bitisi <= okul_bitis_dt: continue 
                 
                 suanki_zaman = calisma_baslangici
                 
@@ -216,37 +199,26 @@ def program_olustur_algo(kullanici_id):
                     if gorev_bitis_zamani <= calisma_bitisi:
                         gorev_sirasi += 1
                         yeni_gorev = ProgramGorev(
-                            kullanici_id=kullanici_id,
-                            kayit_id=gorev['kayit_id'],
-                            gorev_tarihi=suanki_tarih.date(),
-                            baslangic_saati=suanki_zaman.time(),
-                            bitis_saati=gorev_bitis_zamani.time(),
-                            gorev_adi=f"[{gorev['zorluk']}] {gorev['kayit'].ders_adi}: {gorev['tip']}",
-                            gorev_sirasi=gorev_sirasi
+                            kullanici_id=kullanici_id, kayit_id=gorev['kayit_id'], gorev_tarihi=suanki_tarih.date(),
+                            baslangic_saati=suanki_zaman.time(), bitis_saati=gorev_bitis_zamani.time(),
+                            gorev_adi=f"[{gorev['zorluk']}] {gorev['kayit'].ders_adi}: {gorev['tip']}", gorev_sirasi=gorev_sirasi
                         )
                         db.session.add(yeni_gorev)
-                        # 15 dakika mola
-                        suanki_zaman = gorev_bitis_zamani + timedelta(minutes=15)
+                        suanki_zaman = gorev_bitis_zamani + timedelta(minutes=15) # 15 dakika mola
                     else:
-                        gorev_havuzu.insert(0, gorev)
-                        break
+                        gorev_havuzu.insert(0, gorev); break
 
-            except Exception:
-                continue 
+            except Exception: continue 
     
     db.session.commit()
     return True
 
-
-# --- ROTALAR ---
+# --- ROTALAR (Aynı kaldı) ---
+# ... (Tüm Rotalar buraya kopyalanır) ...
 @app.route('/')
 def ana_sayfa_yonlendirme():
-    if not current_user.is_authenticated:
-        return redirect(url_for('giris'))
+    if not current_user.is_authenticated: return redirect(url_for('giris'))
     return redirect(url_for('index'))
-
-
-# --- (Giriş, Kayıt, Çıkış, Ajanda, Ekle, Sil, Not Gir, Ayarlar ve Program rotaları aynı kaldı) ---
 
 @app.route('/giris', methods=['GET', 'POST'])
 def giris():
@@ -383,12 +355,6 @@ def program_guncelle(gorev_id):
         except: db.session.rollback(); flash('Görev durumu güncellenirken bir hata oluştu.', 'danger')
     return redirect(url_for('program'))
 
-
-# --- Uygulama bağlamı dışında tablo oluşturmayı zorlama ---
-# Render'da ilk başlatma sırasında tabloların mutlaka oluşmasını sağlar.
-with app.app_context():
-    db.create_all()
-# -----------------------------------------------------------
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
