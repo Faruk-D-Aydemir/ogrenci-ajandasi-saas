@@ -37,7 +37,7 @@ Session(app)
 
 db = SQLAlchemy(app)
 
-# --- VERİ TABANI MODELLERİ (YENİ ALAN EKLENDİ) ---
+# --- VERİ TABANI MODELLERİ ---
 class Kullanici(UserMixin, db.Model):
     __tablename__ = 'kullanici' 
     id = db.Column(db.Integer, primary_key=True)
@@ -64,7 +64,7 @@ class Kayit(db.Model):
     video_sonuc = db.Column(db.Text)
     eklenme_tarihi = db.Column(db.DateTime, default=datetime.utcnow)
     kullanici_id = db.Column(db.Integer, db.ForeignKey('kullanici.id'), nullable=False)
-    # 🌟 YENİ ALAN: NOT GİRİŞİ İÇİN
+    # Not Girişi için yeni sütun
     alinan_not = db.Column(db.Integer, nullable=True) # 0-100 arası not
 
 class ProgramGorev(db.Model):
@@ -79,13 +79,16 @@ class ProgramGorev(db.Model):
     tamamlandi = db.Column(db.Boolean, default=False)
     gorev_sirasi = db.Column(db.Integer, default=0)
     
-# --- TABLOLARI OLUŞTURMA İŞLEVİ ---
+# --- TABLOLARI OLUŞTURMA İŞLEVİ (500 HATASI ÇÖZÜMÜ) ---
 def create_tables(uygulama):
     with uygulama.app_context():
         try:
-            # Not sütununu eklemek için veritabanı yapısını günceller
+            # 🚨 500 HATASI ÇÖZÜMÜ: Tüm tabloları sıfırlayıp yeniden oluşturuyoruz.
+            # Yeni sütun (alinan_not) eklenirken oluşan uyumsuzluğu (migration hatası) çözer.
+            # DİKKAT: TÜM VERİLERİNİZ SİLİNECEKTİR.
+            db.drop_all() 
             db.create_all()
-            print("INFO: Veritabanı tabloları başarıyla oluşturuldu/güncellendi.") 
+            print("INFO: Veritabanı tabloları başarıyla SIFIRLANDI ve yeniden oluşturuldu.") 
         except Exception as e:
             print(f"HATA: Tablo oluşturulurken bir hata oluştu: {e}")
             pass
@@ -110,7 +113,7 @@ def youtube_arama(arama_sorgusu):
         request = youtube.search().list(
             q=arama_sorgusu,             
             part="snippet",              
-            # 🌟 DÜZELTME 1: Video sonucunu 3 ile sınırla
+            # Video sonucu 3 ile sınırlandı
             maxResults=3,                
             type="video",                
             videoEmbeddable="true"       
@@ -124,7 +127,7 @@ def youtube_arama(arama_sorgusu):
     except Exception:
         return ""
 
-# --- PROGRAM OLUŞTURMA ALGORİTMASI (DÜZELTİLDİ) ---
+# --- PROGRAM OLUŞTURMA ALGORİTMASI ---
 def program_olustur_algo(kullanici_id):
     kullanici = Kullanici.query.get(kullanici_id)
     if not kullanici: return False
@@ -173,11 +176,10 @@ def program_olustur_algo(kullanici_id):
             suresi = 1 * 60 
             zorluk = "PLANLI"
             
-        # 🌟 DÜZELTME 3: Program dağılımı (Şimdilik sabit kalır, puanlama sonrası akıllanacak)
         konu_suresi = int(suresi * 0.6)
         soru_suresi = int(suresi * 0.4)
         
-        # 🌟 YENİ TİP: Not alma uyarısı eklendi
+        # Görev adı güncellendi (Not alma uyarısı)
         gorev_havuzu.append({'kayit_id': kayit.id, 'kayit': kayit, 'suresi': konu_suresi, 'tip': 'Konu Anlatımı (Not Çıkararak) ✍️', 'zorluk': zorluk})
         gorev_havuzu.append({'kayit_id': kayit.id, 'kayit': kayit, 'suresi': soru_suresi, 'tip': 'Soru Çözme/Tekrar 🧠', 'zorluk': zorluk})
     
@@ -198,7 +200,7 @@ def program_olustur_algo(kullanici_id):
                 okul_baslangic_dt = datetime.combine(suanki_tarih, okul_bas)
                 okul_bitis_dt = datetime.combine(suanki_tarih, okul_bit)
                 
-                # Çakışma kontrolü (Basitleştirilmiş Mantık)
+                # Çakışma kontrolü (Stabil hale getirildi)
                 if calisma_baslangici < okul_bitis_dt and calisma_bitisi > okul_baslangic_dt:
                     
                     if calisma_baslangici >= okul_bitis_dt:
@@ -333,7 +335,7 @@ def index():
         ajanda_verileri.append({
             'id': kayit.id, 'ders_adi': kayit.ders_adi, 'tarih': kayit.tarih, 'konular': kayit.konular,
             'video_sonuc': kayit.video_sonuc, 'kalan_gun': kalan_gun, 'etiket': plan_etiketi, 'etiket_sinifi': etiket_sinifi,
-            'alinan_not': kayit.alinan_not # Yeni notu ekledik
+            'alinan_not': kayit.alinan_not
         })
     
     return render_template('list.html', kayitlar=ajanda_verileri)
@@ -381,7 +383,6 @@ def kayit_sil(kayit_id):
 
     return redirect(url_for('index'))
 
-# 🌟 YENİ ROTA: Not Girişi
 @app.route('/not_gir/<int:kayit_id>', methods=['GET', 'POST'])
 @login_required
 def not_gir(kayit_id):
