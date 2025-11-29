@@ -79,16 +79,13 @@ class ProgramGorev(db.Model):
     tamamlandi = db.Column(db.Boolean, default=False)
     gorev_sirasi = db.Column(db.Integer, default=0)
     
-# --- TABLOLARI OLUŞTURMA İŞLEVİ (500 HATASI ÇÖZÜMÜ) ---
+# --- TABLOLARI OLUŞTURMA İŞLEVİ (TEMİZLENMİŞ VE NİHAİ VERSİYON) ---
 def create_tables(uygulama):
     with uygulama.app_context():
         try:
-            # 🚨 500 HATASI ÇÖZÜMÜ: Tüm tabloları sıfırlayıp yeniden oluşturuyoruz.
-            # Yeni sütun (alinan_not) eklenirken oluşan uyumsuzluğu (migration hatası) çözer.
-            # DİKKAT: TÜM VERİLERİNİZ SİLİNECEKTİR.
-            db.drop_all() 
+            # db.drop_all() kaldırıldı. Yalnızca create_all() kaldı.
             db.create_all()
-            print("INFO: Veritabanı tabloları başarıyla SIFIRLANDI ve yeniden oluşturuldu.") 
+            print("INFO: Veritabanı tabloları başarıyla oluşturuldu/güncellendi.") 
         except Exception as e:
             print(f"HATA: Tablo oluşturulurken bir hata oluştu: {e}")
             pass
