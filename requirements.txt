@@ -8,3 +8,5 @@ Flask-Session
 pymysql
 cryptography
 gunicorn
+requests
+pymysql
