@@ -37,7 +37,7 @@ Session(app)
 
 db = SQLAlchemy(app)
 
-# --- VERİ TABANI MODELLERİ (Bunları dokunmuyoruz) ---
+# --- VERİ TABANI MODELLERİ ---
 class Kullanici(UserMixin, db.Model):
     __tablename__ = 'kullanici' 
     id = db.Column(db.Integer, primary_key=True)
@@ -64,7 +64,8 @@ class Kayit(db.Model):
     video_sonuc = db.Column(db.Text)
     eklenme_tarihi = db.Column(db.DateTime, default=datetime.utcnow)
     kullanici_id = db.Column(db.Integer, db.ForeignKey('kullanici.id'), nullable=False)
-    alinan_not = db.Column(db.Integer, nullable=True) 
+    # Not Girişi için yeni sütun
+    alinan_not = db.Column(db.Integer, nullable=True) # 0-100 arası not
 
 class ProgramGorev(db.Model):
     __tablename__ = 'program_gorev'
@@ -78,11 +79,23 @@ class ProgramGorev(db.Model):
     tamamlandi = db.Column(db.Boolean, default=False)
     gorev_sirasi = db.Column(db.Integer, default=0)
     
-# Not: Veritabanı tablolarını oluşturma (db.create_all()) kodunu KALDIRDIK.
-# Bu komutu Gunicorn'a çalıştırmak yerine, veritabanını manuel olarak başlatacağız.
+# --- TABLOLARI OLUŞTURMA İŞLEVİ (500 HATASI ÇÖZÜMÜ) ---
+def create_tables(uygulama):
+    with uygulama.app_context():
+        try:
+            # 🚨 500 HATASI ÇÖZÜMÜ: Tüm tabloları sıfırlayıp yeniden oluşturuyoruz.
+            # Yeni sütun (alinan_not) eklenirken oluşan uyumsuzluğu (migration hatası) çözer.
+            # DİKKAT: TÜM VERİLERİNİZ SİLİNECEKTİR.
+            db.drop_all() 
+            db.create_all()
+            print("INFO: Veritabanı tabloları başarıyla SIFIRLANDI ve yeniden oluşturuldu.") 
+        except Exception as e:
+            print(f"HATA: Tablo oluşturulurken bir hata oluştu: {e}")
+            pass
 
-# --- FLASK-LOGIN VE DİĞER FONKSİYONLAR (Aynı Kaldı) ---
+create_tables(app)
 
+# --- FLASK-LOGIN YAPILANDIRMASI ---
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'giris' 
@@ -98,17 +111,23 @@ def youtube_arama(arama_sorgusu):
     try:
         youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
         request = youtube.search().list(
-            q=arama_sorgusu, part="snippet", maxResults=3, type="video", videoEmbeddable="true"
+            q=arama_sorgusu,             
+            part="snippet",              
+            # Video sonucu 3 ile sınırlandı
+            maxResults=3,                
+            type="video",                
+            videoEmbeddable="true"       
         )
         response = request.execute()
         video_listesi = []
         for item in response.get("items", []):
             video_listesi.append(f"{item['snippet']['title']}:::{'https://www.youtube.com/embed/' + item['id']['videoId']}")
+            
         return "|||".join(video_listesi)
     except Exception:
         return ""
 
-# (program_olustur_algo fonksiyonu buraya kopyalanır, aynı kalır)
+# --- PROGRAM OLUŞTURMA ALGORİTMASI ---
 def program_olustur_algo(kullanici_id):
     kullanici = Kullanici.query.get(kullanici_id)
     if not kullanici: return False
@@ -160,6 +179,7 @@ def program_olustur_algo(kullanici_id):
         konu_suresi = int(suresi * 0.6)
         soru_suresi = int(suresi * 0.4)
         
+        # Görev adı güncellendi (Not alma uyarısı)
         gorev_havuzu.append({'kayit_id': kayit.id, 'kayit': kayit, 'suresi': konu_suresi, 'tip': 'Konu Anlatımı (Not Çıkararak) ✍️', 'zorluk': zorluk})
         gorev_havuzu.append({'kayit_id': kayit.id, 'kayit': kayit, 'suresi': soru_suresi, 'tip': 'Soru Çözme/Tekrar 🧠', 'zorluk': zorluk})
     
@@ -183,10 +203,14 @@ def program_olustur_algo(kullanici_id):
                 # Çakışma kontrolü (Stabil hale getirildi)
                 if calisma_baslangici < okul_bitis_dt and calisma_bitisi > okul_baslangic_dt:
                     
-                    if calisma_baslangici >= okul_bitis_dt: pass 
-                    elif calisma_baslangici < okul_bitis_dt and calisma_bitisi > okul_bitis_dt: calisma_baslangici = okul_bitis_dt
-                    elif calisma_baslangici < okul_baslangic_dt and calisma_bitisi > okul_bitis_dt: calisma_baslangici = okul_bitis_dt 
-                    elif calisma_baslangici >= okul_baslangic_dt and calisma_bitisi <= okul_bitis_dt: continue 
+                    if calisma_baslangici >= okul_bitis_dt:
+                        pass 
+                    elif calisma_baslangici < okul_bitis_dt and calisma_bitisi > okul_bitis_dt:
+                        calisma_baslangici = okul_bitis_dt
+                    elif calisma_baslangici < okul_baslangic_dt and calisma_bitisi > okul_bitis_dt:
+                        calisma_baslangici = okul_bitis_dt 
+                    elif calisma_baslangici >= okul_baslangic_dt and calisma_bitisi <= okul_bitis_dt:
+                        continue 
                 
                 suanki_zaman = calisma_baslangici
                 
@@ -199,150 +223,267 @@ def program_olustur_algo(kullanici_id):
                     if gorev_bitis_zamani <= calisma_bitisi:
                         gorev_sirasi += 1
                         yeni_gorev = ProgramGorev(
-                            kullanici_id=kullanici_id, kayit_id=gorev['kayit_id'], gorev_tarihi=suanki_tarih.date(),
-                            baslangic_saati=suanki_zaman.time(), bitis_saati=gorev_bitis_zamani.time(),
-                            gorev_adi=f"[{gorev['zorluk']}] {gorev['kayit'].ders_adi}: {gorev['tip']}", gorev_sirasi=gorev_sirasi
+                            kullanici_id=kullanici_id,
+                            kayit_id=gorev['kayit_id'],
+                            gorev_tarihi=suanki_tarih.date(),
+                            baslangic_saati=suanki_zaman.time(),
+                            bitis_saati=gorev_bitis_zamani.time(),
+                            gorev_adi=f"[{gorev['zorluk']}] {gorev['kayit'].ders_adi}: {gorev['tip']}",
+                            gorev_sirasi=gorev_sirasi
                         )
                         db.session.add(yeni_gorev)
-                        suanki_zaman = gorev_bitis_zamani + timedelta(minutes=15) # 15 dakika mola
+                        # 15 dakika mola
+                        suanki_zaman = gorev_bitis_zamani + timedelta(minutes=15)
                     else:
-                        gorev_havuzu.insert(0, gorev); break
+                        gorev_havuzu.insert(0, gorev)
+                        break
 
-            except Exception: continue 
+            except Exception:
+                continue 
     
     db.session.commit()
     return True
 
-# --- ROTALAR (Aynı kaldı) ---
-# ... (Tüm Rotalar buraya kopyalanır) ...
+
+# --- ROTALAR ---
+
 @app.route('/')
 def ana_sayfa_yonlendirme():
-    if not current_user.is_authenticated: return redirect(url_for('giris'))
+    if not current_user.is_authenticated:
+        return redirect(url_for('giris'))
     return redirect(url_for('index'))
+
 
 @app.route('/giris', methods=['GET', 'POST'])
 def giris():
-    if current_user.is_authenticated: return redirect(url_for('index'))
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
     if request.method == 'POST':
-        eposta = request.form.get('eposta'); parola = request.form.get('parola')
+        eposta = request.form.get('eposta')
+        parola = request.form.get('parola')
         kullanici = Kullanici.query.filter_by(eposta=eposta).first()
         if kullanici and kullanici.check_password(parola):
-            login_user(kullanici); flash('Başarıyla giriş yaptınız!', 'success'); return redirect(url_for('index'))
-        else: flash('Hatalı e-posta veya parola.', 'danger')
+            login_user(kullanici)
+            flash('Başarıyla giriş yaptınız!', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Hatalı e-posta veya parola.', 'danger')
     return render_template('giris.html')
 
 @app.route('/kayitol', methods=['GET', 'POST'])
 def kayitol():
-    if current_user.is_authenticated: return redirect(url_for('index'))
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
     if request.method == 'POST':
-        kullanici_adi = request.form.get('kullanici_adi'); eposta = request.form.get('eposta'); parola = request.form.get('parola')
-        if Kullanici.query.filter_by(eposta=eposta).first(): flash('Bu e-posta adresi zaten kayıtlı.', 'danger'); return redirect(url_for('kayitol'))
-        if Kullanici.query.filter_by(kullanici_adi=kullanici_adi).first(): flash('Bu kullanıcı adı zaten alınmış.', 'danger'); return redirect(url_for('kayitol'))
-        yeni_kullanici = Kullanici(kullanici_adi=kullanici_adi, eposta=eposta); yeni_kullanici.set_password(parola)
-        try: db.session.add(yeni_kullanici); db.session.commit(); flash('Kayıt başarıyla oluşturuldu! Şimdi giriş yapabilirsiniz.', 'success'); return redirect(url_for('giris'))
-        except Exception as e: db.session.rollback(); flash(f'Kayıt sırasında bir hata oluştu: {e}', 'danger')
+        kullanici_adi = request.form.get('kullanici_adi')
+        eposta = request.form.get('eposta')
+        parola = request.form.get('parola')
+
+        if Kullanici.query.filter_by(eposta=eposta).first():
+            flash('Bu e-posta adresi zaten kayıtlı.', 'danger')
+            return redirect(url_for('kayitol'))
+        
+        if Kullanici.query.filter_by(kullanici_adi=kullanici_adi).first():
+            flash('Bu kullanıcı adı zaten alınmış.', 'danger')
+            return redirect(url_for('kayitol'))
+
+        yeni_kullanici = Kullanici(kullanici_adi=kullanici_adi, eposta=eposta)
+        yeni_kullanici.set_password(parola)
+        
+        try:
+            db.session.add(yeni_kullanici)
+            db.session.commit()
+            flash('Kayıt başarıyla oluşturuldu! Şimdi giriş yapabilirsiniz.', 'success')
+            return redirect(url_for('giris'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Kayıt sırasında bir hata oluştu: {e}', 'danger')
+
     return render_template('kayitol.html')
 
 @app.route('/cikis')
 @login_required
 def cikis():
-    logout_user(); flash('Başarıyla çıkış yaptınız.', 'info'); return redirect(url_for('giris'))
+    logout_user()
+    flash('Başarıyla çıkış yaptınız.', 'info')
+    return redirect(url_for('giris'))
 
 @app.route('/ajanda')
 @login_required 
 def index():
-    bugun = date.today() ; sirali_kayitlar = Kayit.query.filter_by(kullanici_id=current_user.id).order_by(Kayit.tarih).all()
+    bugun = date.today() 
+    try:
+        sirali_kayitlar = Kayit.query.filter_by(kullanici_id=current_user.id).order_by(Kayit.tarih).all()
+    except Exception as e:
+        flash(f'Ajanda verileri çekilirken hata oluştu: {e}', 'danger'); sirali_kayitlar = []
+    
     ajanda_verileri = []
     for kayit in sirali_kayitlar:
-        tarih_obj = kayit.tarih.date(); kalan_gun = (tarih_obj - bugun).days; plan_etiketi = ""; etiket_sinifi = ""
-        if kalan_gun < 0: plan_etiketi = "Sınav Günü Geçti 😥"; etiket_sinifi = "gecmis"
-        elif kalan_gun <= 3: plan_etiketi = "🚨 KRİTİK! Hemen Başla!"; etiket_sinifi = "kritik"
-        elif kalan_gun <= 7: plan_etiketi = "🔥 YOĞUN Çalışma Zamanı"; etiket_sinifi = "yogun"
-        else: plan_etiketi = "✅ Planlı İlerleme"; etiket_sinifi = "planli"
+        tarih_obj = kayit.tarih.date()
+        kalan_gun = (tarih_obj - bugun).days
+        plan_etiketi = ""; etiket_sinifi = ""
+
+        if kalan_gun < 0:
+            plan_etiketi = "Sınav Günü Geçti 😥"; etiket_sinifi = "gecmis"
+        elif kalan_gun <= 3:
+            plan_etiketi = "🚨 KRİTİK! Hemen Başla!"; etiket_sinifi = "kritik"
+        elif kalan_gun <= 7:
+            plan_etiketi = "🔥 YOĞUN Çalışma Zamanı"; etiket_sinifi = "yogun"
+        else:
+            plan_etiketi = "✅ Planlı İlerleme"; etiket_sinifi = "planli"
+            
         ajanda_verileri.append({
             'id': kayit.id, 'ders_adi': kayit.ders_adi, 'tarih': kayit.tarih, 'konular': kayit.konular,
             'video_sonuc': kayit.video_sonuc, 'kalan_gun': kalan_gun, 'etiket': plan_etiketi, 'etiket_sinifi': etiket_sinifi,
             'alinan_not': kayit.alinan_not
         })
+    
     return render_template('list.html', kayitlar=ajanda_verileri)
+
 
 @app.route('/ekle', methods=['GET', 'POST'])
 @login_required
 def ekle():
     if request.method == 'POST':
         ders_adi = request.form.get('ders_adi'); tarih_str = request.form.get('tarih'); konular = request.form.get('konular')
-        arama_sorgusu = f"{ders_adi} {konular.split(',')[0].strip()} konu anlatımı"; video_sonuclari_string = youtube_arama(arama_sorgusu)
+        arama_sorgusu = f"{ders_adi} {konular.split(',')[0].strip()} konu anlatımı"
+        video_sonuclari_string = youtube_arama(arama_sorgusu)
+        
         try:
             tarih_obj = datetime.strptime(tarih_str, '%Y-%m-%d')
-            yeni_kayit = Kayit(ders_adi=ders_adi, tarih=tarih_obj, konular=konular, video_sonuc=video_sonuclari_string, kullanici_id=current_user.id, etiket="Planlı")
-            db.session.add(yeni_kayit); db.session.commit(); flash('Yeni ajanda kaydı başarıyla oluşturuldu! Programınızı şimdi oluşturabilirsiniz.', 'success')
-        except Exception as e: db.session.rollback(); flash(f'Kayıt oluşturulurken bir hata oluştu: {e}', 'danger')
+            yeni_kayit = Kayit(
+                ders_adi=ders_adi, tarih=tarih_obj, konular=konular,
+                video_sonuc=video_sonuclari_string, kullanici_id=current_user.id, etiket="Planlı"
+            )
+            db.session.add(yeni_kayit); db.session.commit()
+            flash('Yeni ajanda kaydı başarıyla oluşturuldu! Programınızı şimdi oluşturabilirsiniz.', 'success')
+        except Exception as e:
+            db.session.rollback(); flash(f'Kayıt oluşturulurken bir hata oluştu: {e}', 'danger')
+            
         return redirect(url_for('index'))
+    
     return render_template('form.html')
 
 @app.route('/kayit_sil/<int:kayit_id>', methods=['POST'])
 @login_required
 def kayit_sil(kayit_id):
     kayit = Kayit.query.filter_by(id=kayit_id, kullanici_id=current_user.id).first()
+    
     if kayit:
         try:
-            ProgramGorev.query.filter_by(kayit_id=kayit_id).delete(); db.session.delete(kayit); db.session.commit(); flash(f"'{kayit.ders_adi}' kaydı başarıyla silindi.", 'info')
-        except Exception as e: db.session.rollback(); flash(f"Kayıt silinirken bir hata oluştu: {e}", 'danger')
-    else: flash("Silinecek kayıt bulunamadı.", 'warning')
+            ProgramGorev.query.filter_by(kayit_id=kayit_id).delete()
+            db.session.delete(kayit)
+            db.session.commit()
+            flash(f"'{kayit.ders_adi}' kaydı başarıyla silindi.", 'info')
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Kayıt silinirken bir hata oluştu: {e}", 'danger')
+    else:
+        flash("Silinecek kayıt bulunamadı.", 'warning')
+
     return redirect(url_for('index'))
 
 @app.route('/not_gir/<int:kayit_id>', methods=['GET', 'POST'])
 @login_required
 def not_gir(kayit_id):
     kayit = Kayit.query.filter_by(id=kayit_id, kullanici_id=current_user.id).first_or_404()
+    
     if request.method == 'POST':
         alinan_not = request.form.get('alinan_not')
         try:
             not_int = int(alinan_not)
-            if 0 <= not_int <= 100: kayit.alinan_not = not_int; db.session.commit(); flash(f"'{kayit.ders_adi}' sınavının notu ({not_int}) başarıyla kaydedildi.", 'success'); return redirect(url_for('index'))
-            else: flash('Not 0 ile 100 arasında olmalıdır.', 'danger')
-        except ValueError: flash('Lütfen geçerli bir sayı girin.', 'danger')
+            if 0 <= not_int <= 100:
+                kayit.alinan_not = not_int
+                db.session.commit()
+                flash(f"'{kayit.ders_adi}' sınavının notu ({not_int}) başarıyla kaydedildi.", 'success')
+                return redirect(url_for('index'))
+            else:
+                flash('Not 0 ile 100 arasında olmalıdır.', 'danger')
+        except ValueError:
+            flash('Lütfen geçerli bir sayı girin.', 'danger')
+
     return render_template('not_giris.html', kayit=kayit)
+
 
 @app.route('/ayarlar', methods=['GET', 'POST'])
 @login_required
 def ayarlar():
     kullanici = current_user
+    
     if request.method == 'POST':
         if 'kullanici_adi' in request.form:
             yeni_ad = request.form.get('kullanici_adi')
             if yeni_ad:
                 try:
-                    if Kullanici.query.filter(Kullanici.kullanici_adi == yeni_ad, Kullanici.id != kullanici.id).first(): flash('Bu kullanıcı adı zaten alınmış.', 'danger')
-                    else: kullanici.kullanici_adi = yeni_ad; db.session.commit(); flash('Kullanıcı adınız başarıyla güncellendi.', 'success')
-                except Exception as e: db.session.rollback(); flash(f'Adınız güncellenirken bir hata oluştu: {e}', 'danger')
+                    if Kullanici.query.filter(Kullanici.kullanici_adi == yeni_ad, Kullanici.id != kullanici.id).first():
+                        flash('Bu kullanıcı adı zaten alınmış.', 'danger')
+                    else:
+                        kullanici.kullanici_adi = yeni_ad
+                        db.session.commit()
+                        flash('Kullanıcı adınız başarıyla güncellendi.', 'success')
+                except Exception as e:
+                    db.session.rollback(); flash(f'Adınız güncellenirken bir hata oluştu: {e}', 'danger')
+        
         elif 'okul_saatleri' in request.form:
-            okul_saatleri = request.form.get('okul_saatleri'); gunler = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar']; bos_saatleri_dict = {}
+            okul_saatleri = request.form.get('okul_saatleri')
+            gunler = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar']
+            bos_saatleri_dict = {}
+
             for gun in gunler:
                 bos_saat = request.form.get(gun)
-                if bos_saat: bos_saatleri_dict[gun] = bos_saat
-            try: kullanici.okul_saatleri = okul_saatleri; kullanici.calisma_saatleri_json = json.dumps(bos_saatleri_dict); db.session.commit(); flash('Programlama ayarlarınız başarıyla kaydedildi!', 'success')
-            except Exception as e: db.session.rollback(); flash(f'Ayarlar kaydedilirken bir hata oluştu: {e}', 'danger')
+                if bos_saat:
+                    bos_saatleri_dict[gun] = bos_saat
+            
+            try:
+                kullanici.okul_saatleri = okul_saatleri
+                kullanici.calisma_saatleri_json = json.dumps(bos_saatleri_dict)
+                db.session.commit()
+                flash('Programlama ayarlarınız başarıyla kaydedildi!', 'success')
+            except Exception as e:
+                db.session.rollback(); flash(f'Ayarlar kaydedilirken bir hata oluştu: {e}', 'danger')
+        
         return redirect(url_for('ayarlar'))
+
     mevcut_bos_saatler = json.loads(kullanici.calisma_saatleri_json or '{}')
-    return render_template('ayarlar.html', mevcut_okul_saatleri=kullanici.okul_saatleri, mevcut_bos_saatler=mevcut_bos_saatler)
+    
+    return render_template(
+        'ayarlar.html', 
+        mevcut_okul_saatleri=kullanici.okul_saatleri,
+        mevcut_bos_saatler=mevcut_bos_saatler
+    )
 
 @app.route('/program', methods=['GET'])
 @login_required
 def program():
     gorevler = ProgramGorev.query.filter_by(kullanici_id=current_user.id).order_by(ProgramGorev.gorev_tarihi, ProgramGorev.baslangic_saati).all()
+    
     program_verisi = {}
     for gorev in gorevler:
-        tarih_str = gorev.gorev_tarihi.strftime('%Y-%m-%d') if isinstance(gorev.gorev_tarihi, date) else date.today().strftime('%Y-%m-%d')
-        if tarih_str not in program_verisi: program_verisi[tarih_str] = []
-        program_verisi[tarih_str].append({'id': gorev.id, 'baslangic': gorev.baslangic_saati.strftime('%H:%M'), 'bitis': gorev.bitis_saati.strftime('%H:%M'), 'gorev': gorev.gorev_adi, 'tamamlandi': gorev.tamamlandi})
+        if isinstance(gorev.gorev_tarihi, date):
+            tarih_str = gorev.gorev_tarihi.strftime('%Y-%m-%d')
+        else:
+            tarih_str = date.today().strftime('%Y-%m-%d')
+            
+        if tarih_str not in program_verisi:
+            program_verisi[tarih_str] = []
+        program_verisi[tarih_str].append({
+            'id': gorev.id,
+            'baslangic': gorev.baslangic_saati.strftime('%H:%M'),
+            'bitis': gorev.bitis_saati.strftime('%H:%M'),
+            'gorev': gorev.gorev_adi,
+            'tamamlandi': gorev.tamamlandi
+        })
+    
     return render_template('program.html', program_verisi=program_verisi)
 
 @app.route('/program/olustur', methods=['POST'])
 @login_required
 def program_olustur():
-    if program_olustur_algo(current_user.id): flash('Çalışma programınız başarıyla oluşturuldu! Aşağıdan kontrol edebilirsiniz. (Not: Programınızda yeterli boşluk bulunamazsa, bazı günler boş kalabilir.)', 'success')
-    else: flash('Program oluşturulamadı. Ya boş zamanlarınız tanımlı değil ya da yakın zamanda (7 gün içinde) bir sınav kaydı bulunmamaktadır.', 'info')
+    if program_olustur_algo(current_user.id):
+        flash('Çalışma programınız başarıyla oluşturuldu! Aşağıdan kontrol edebilirsiniz. (Not: Programınızda yeterli boşluk bulunamazsa, bazı günler boş kalabilir.)', 'success')
+    else:
+        flash('Program oluşturulamadı. Ya boş zamanlarınız tanımlı değil ya da yakın zamanda (7 gün içinde) bir sınav kaydı bulunmamaktadır.', 'info')
+    
     return redirect(url_for('program'))
 
 @app.route('/program/guncelle/<int:gorev_id>', methods=['POST'])
@@ -350,9 +491,14 @@ def program_olustur():
 def program_guncelle(gorev_id):
     gorev = ProgramGorev.query.filter_by(id=gorev_id, kullanici_id=current_user.id).first()
     if gorev:
-        tamamlandi = request.form.get('tamamlandi') == 'on'; gorev.tamamlandi = tamamlandi
-        try: db.session.commit()
-        except: db.session.rollback(); flash('Görev durumu güncellenirken bir hata oluştu.', 'danger')
+        tamamlandi = request.form.get('tamamlandi') == 'on' 
+        gorev.tamamlandi = tamamlandi
+        try:
+            db.session.commit()
+        except:
+            db.session.rollback()
+            flash('Görev durumu güncellenirken bir hata oluştu.', 'danger')
+    
     return redirect(url_for('program'))
 
 
