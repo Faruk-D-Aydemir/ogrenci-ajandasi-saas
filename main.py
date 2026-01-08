@@ -8,13 +8,13 @@ import requests
 
 app = Flask(__name__)
 
-# --- KONFİGÜRASYON ---
+# --- AYARLAR ---
 uri = os.getenv('DATABASE_URL')
 if uri and uri.startswith("mysql://"):
     uri = uri.replace("mysql://", "mysql+pymysql://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = uri or 'sqlite:///ajanda.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'cok-gizli-anahtar-99')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-anahtar-77')
 
 db = SQLAlchemy(app)
 
@@ -36,19 +36,18 @@ class Kayit(db.Model):
     ders_adi = db.Column(db.String(100), nullable=False)
     tarih = db.Column(db.DateTime, default=datetime.utcnow)
     konular = db.Column(db.Text, nullable=False)
-    video_sonuc = db.Column(db.Text) # "Başlık:::Link|||Başlık:::Link" formatında saklar
+    video_sonuc = db.Column(db.Text) 
     kullanici_id = db.Column(db.Integer, db.ForeignKey('kullanici.id'), nullable=False)
 
-# --- LOGIN AYARLARI ---
+# --- LOGIN ---
 login_manager = LoginManager(app)
 login_manager.login_view = 'giris'
-login_manager.login_message = "Lütfen önce giriş yapın."
 
 @login_manager.user_loader
 def load_user(user_id):
     return Kullanici.query.get(int(user_id))
 
-# --- YOUTUBE API FONKSİYONU (ZIRHLI) ---
+# --- YOUTUBE API ---
 def get_youtube_videos(query):
     api_key = os.getenv('YOUTUBE_API_KEY')
     if not api_key:
@@ -63,8 +62,7 @@ def get_youtube_videos(query):
             video_id = item['id']['videoId']
             videos.append(f"{title}:::https://www.youtube.com/watch?v={video_id}")
         return "|||".join(videos)
-    except Exception as e:
-        print(f"YouTube Hatası: {e}")
+    except:
         return ""
 
 # --- ROTALAR ---
@@ -82,21 +80,27 @@ def ekle():
         konu = request.form.get('konular')
         tarih_str = request.form.get('tarih')
         
-        # Videoları çek
         videolar = get_youtube_videos(f"{ders} {konu}")
         
-        yeni_kayit = Kayit(
-            ders_adi=ders,
-            konular=konu,
+        yeni = Kayit(
+            ders_adi=ders, konular=konu,
             tarih=datetime.strptime(tarih_str, '%Y-%m-%d'),
-            video_sonuc=videolar,
-            kullanici_id=current_user.id
+            video_sonuc=videolar, kullanici_id=current_user.id
         )
-        db.session.add(yeni_kayit)
-        db.session.commit()
-        flash('Ders başarıyla eklendi ve videolar getirildi!', 'success')
+        db.session.add(yeni); db.session.commit()
+        flash('Ders ve videolar eklendi!', 'success')
         return redirect(url_for('index'))
     return render_template('form.html')
+
+@app.route('/sil/<int:id>')
+@login_required
+def sil(id):
+    kayit = Kayit.query.get_or_404(id)
+    if kayit.kullanici_id == current_user.id:
+        db.session.delete(kayit)
+        db.session.commit()
+        flash('Ders silindi.', 'warning')
+    return redirect(url_for('index'))
 
 @app.route('/ayarlar', methods=['GET', 'POST'])
 @login_required
@@ -114,29 +118,25 @@ def giris():
         if user and user.check_password(request.form.get('parola')):
             login_user(user)
             return redirect(url_for('index'))
-        flash('E-posta veya şifre hatalı!', 'danger')
+        flash('Hatalı bilgiler!', 'danger')
     return render_template('giris.html')
 
 @app.route('/kayitol', methods=['GET', 'POST'])
 def kayitol():
     if request.method == 'POST':
         if Kullanici.query.filter_by(eposta=request.form.get('eposta')).first():
-            flash('Bu e-posta zaten kullanımda!', 'warning')
+            flash('E-posta kayıtlı!', 'warning')
         else:
             yeni = Kullanici(kullanici_adi=request.form.get('kullanici_adi'), eposta=request.form.get('eposta'))
             yeni.set_password(request.form.get('parola'))
             db.session.add(yeni); db.session.commit()
-            flash('Hesap oluşturuldu, giriş yapabilirsiniz.', 'success')
             return redirect(url_for('giris'))
     return render_template('kayitol.html')
 
 @app.route('/cikis')
-@login_required
 def cikis():
-    logout_user()
-    return redirect(url_for('giris'))
+    logout_user(); return redirect(url_for('giris'))
 
-# --- VERİTABANI OLUŞTURMA ---
 with app.app_context():
     db.create_all()
 

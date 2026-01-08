@@ -1,97 +1,34 @@
 {% extends "base.html" %}
-
 {% block content %}
-<div class="container py-4">
-    <div class="row mb-4 align-items-center">
-        <div class="col-md-6">
-            <h2 class="fw-bold">Hoş geldin, <span class="text-primary">{{ current_user.kullanici_adi }}</span> 👋</h2>
-            <p class="text-muted">Bugün neler öğreniyoruz? İşte senin çalışma planın.</p>
-        </div>
-        <div class="col-md-6 text-md-end">
-            <div class="d-inline-block bg-primary text-white p-3 rounded-4 shadow-sm me-2">
-                <h4 class="mb-0 fw-bold">{{ kayitlar|length }}</h4>
-                <small>Toplam Ders</small>
-            </div>
-            <a href="/ekle" class="btn btn-success btn-lg rounded-pill shadow-sm px-4">
-                <i class="fas fa-plus"></i> + Yeni Ders Ekle
-            </a>
-        </div>
-    </div>
-
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ category }} alert-dismissible fade show rounded-4 shadow-sm" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-          </div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
-
-    <hr class="mb-5 opacity-25">
-
-    <div class="row">
-        {% if kayitlar %}
-            {% for kayit in kayitlar %}
-            <div class="col-md-6 col-lg-4 mb-4">
-                <div class="card h-100 shadow-sm border-0 rounded-4 overflow-hidden">
-                    <div class="card-header bg-primary bg-gradient py-3">
-                        <h5 class="card-title mb-0 text-white fw-bold">{{ kayit.ders_adi }}</h5>
-                    </div>
-                    <div class="card-body p-4">
-                        <div class="d-flex align-items-center mb-3">
-                            <span class="badge bg-info text-dark rounded-pill px-3">📅 {{ kayit.tarih.strftime('%d.%m.%Y') }}</span>
-                        </div>
-                        
-                        <p class="card-text text-secondary mb-4">
-                            <strong>Konular:</strong><br>
-                            {{ kayit.konular }}
-                        </p>
-
-                        {% if kayit.video_sonuc %}
-                        <div class="video-section p-3 rounded-3 bg-light border border-dashed text-dark">
-                            <h6 class="small fw-bold text-danger mb-2">📺 YouTube Yardımcı Videolar</h6>
-                            <ul class="list-unstyled mb-0">
-                                {% for video in kayit.video_sonuc.split('|||') %}
-                                    {% set v_data = video.split(':::') %}
-                                    <li class="mb-2">
-                                        <a href="{{ v_data[1] }}" target="_blank" class="text-decoration-none small d-flex align-items-center">
-                                            <span class="me-2 text-danger">▶</span>
-                                            <span class="text-truncate">{{ v_data[0] }}</span>
-                                        </a>
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                        {% else %}
-                        <div class="alert alert-secondary py-2 px-3 small rounded-3 mb-0">
-                            🎥 Bu ders için video bulunamadı.
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        {% else %}
-            <div class="col-12 text-center py-5">
-                <div class="mb-4">
-                    <img src="https://cdn-icons-png.flaticon.com/512/7486/7486744.png" width="100" class="opacity-50" alt="boş">
-                </div>
-                <h4 class="text-muted">Henüz hiç ders eklememişsin!</h4>
-                <p class="text-muted mb-4">Derslerini ekleyerek sana özel YouTube videolarını yakalayabilirsin.</p>
-                <a href="/ekle" class="btn btn-primary rounded-pill px-5 shadow">Hemen Başla</a>
-            </div>
-        {% endif %}
-    </div>
+<div class="d-flex justify-content-between mb-4">
+    <h3>Hoş geldin, {{ current_user.kullanici_adi }}</h3>
+    <a href="/ekle" class="btn btn-primary">+ Yeni Ders</a>
 </div>
 
-<style>
-    /* Gece Modu Uyumlu Ekstra CSS */
-    [data-bs-theme="dark"] .card { background-color: #2b3035; border: 1px solid #373b3e; }
-    [data-bs-theme="dark"] .video-section { background-color: #1e2125 !important; color: #dee2e6 !important; border-color: #495057 !important; }
-    [data-bs-theme="dark"] .video-section a { color: #0dcaf0; }
-    .card { transition: all 0.3s ease; }
-    .card:hover { transform: translateY(-8px); box-shadow: 0 1rem 3rem rgba(0,0,0,.175)!important; }
-</style>
+<div class="row">
+    {% for kayit in kayitlar %}
+    <div class="col-md-4 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <h5 class="fw-bold">{{ kayit.ders_adi }}</h5>
+                    <a href="{{ url_for('sil', id=kayit.id) }}" class="text-danger" onclick="return confirm('Silinsin mi?')">🗑️</a>
+                </div>
+                <small class="text-muted">{{ kayit.tarih.strftime('%d.%m.%Y') }}</small>
+                <p class="mt-2">{{ kayit.konular }}</p>
+                
+                {% if kayit.video_sonuc %}
+                <div class="mt-3 p-2 bg-body-tertiary rounded">
+                    <h6 class="small fw-bold text-danger">📺 Videolar:</h6>
+                    {% for video in kayit.video_sonuc.split('|||') %}
+                        {% set v = video.split(':::') %}
+                        <a href="{{ v[1] }}" target="_blank" class="d-block small mb-1">▶ {{ v[0] }}</a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
 {% endblock %}
