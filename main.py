@@ -8,13 +8,13 @@ import requests
 
 app = Flask(__name__)
 
-# --- AYARLAR ---
+# --- VERİTABANI VE GÜVENLİK ---
 uri = os.getenv('DATABASE_URL')
 if uri and uri.startswith("mysql://"):
     uri = uri.replace("mysql://", "mysql+pymysql://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = uri or 'sqlite:///ajanda.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-anahtar-77')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'nihai-gizli-anahtar-2026')
 
 db = SQLAlchemy(app)
 
@@ -24,46 +24,33 @@ class Kullanici(UserMixin, db.Model):
     kullanici_adi = db.Column(db.String(150), unique=True, nullable=False)
     eposta = db.Column(db.String(150), unique=True, nullable=False)
     parola_hash = db.Column(db.String(512))
-    kayitlar = db.relationship('Kayit', backref='sahibi', lazy=True)
-
-    def set_password(self, parola):
-        self.parola_hash = generate_password_hash(parola)
-    def check_password(self, parola):
-        return check_password_hash(self.parola_hash, parola)
+    def set_password(self, parola): self.parola_hash = generate_password_hash(parola)
+    def check_password(self, parola): return check_password_hash(self.parola_hash, parola)
 
 class Kayit(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ders_adi = db.Column(db.String(100), nullable=False)
     tarih = db.Column(db.DateTime, default=datetime.utcnow)
     konular = db.Column(db.Text, nullable=False)
-    video_sonuc = db.Column(db.Text) 
+    video_sonuc = db.Column(db.Text)
     kullanici_id = db.Column(db.Integer, db.ForeignKey('kullanici.id'), nullable=False)
 
-# --- LOGIN ---
+# --- LOGIN SİSTEMİ ---
 login_manager = LoginManager(app)
 login_manager.login_view = 'giris'
-
 @login_manager.user_loader
-def load_user(user_id):
-    return Kullanici.query.get(int(user_id))
+def load_user(user_id): return Kullanici.query.get(int(user_id))
 
-# --- YOUTUBE API ---
+# --- YOUTUBE MOTORU ---
 def get_youtube_videos(query):
     api_key = os.getenv('YOUTUBE_API_KEY')
-    if not api_key:
-        return ""
+    if not api_key: return ""
     try:
         url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query}&key={api_key}&type=video&maxResults=3"
-        response = requests.get(url, timeout=5)
-        data = response.json()
-        videos = []
-        for item in data.get('items', []):
-            title = item['snippet']['title']
-            video_id = item['id']['videoId']
-            videos.append(f"{title}:::https://www.youtube.com/watch?v={video_id}")
+        r = requests.get(url, timeout=5).json()
+        videos = [f"{i['snippet']['title']}:::https://www.youtube.com/watch?v={i['id']['videoId']}" for i in r.get('items', [])]
         return "|||".join(videos)
-    except:
-        return ""
+    except: return ""
 
 # --- ROTALAR ---
 @app.route('/')
@@ -79,66 +66,45 @@ def ekle():
         ders = request.form.get('ders_adi')
         konu = request.form.get('konular')
         tarih_str = request.form.get('tarih')
-        
-        videolar = get_youtube_videos(f"{ders} {konu}")
-        
-        yeni = Kayit(
-            ders_adi=ders, konular=konu,
-            tarih=datetime.strptime(tarih_str, '%Y-%m-%d'),
-            video_sonuc=videolar, kullanici_id=current_user.id
-        )
+        v_list = get_youtube_videos(f"{ders} {konu}")
+        yeni = Kayit(ders_adi=ders, konular=konu, tarih=datetime.strptime(tarih_str, '%Y-%m-%d'), video_sonuc=v_list, kullanici_id=current_user.id)
         db.session.add(yeni); db.session.commit()
-        flash('Ders ve videolar eklendi!', 'success')
         return redirect(url_for('index'))
     return render_template('form.html')
 
 @app.route('/sil/<int:id>')
 @login_required
 def sil(id):
-    kayit = Kayit.query.get_or_404(id)
-    if kayit.kullanici_id == current_user.id:
-        db.session.delete(kayit)
-        db.session.commit()
-        flash('Ders silindi.', 'warning')
+    k = Kayit.query.get_or_404(id)
+    if k.kullanici_id == current_user.id:
+        db.session.delete(k); db.session.commit()
     return redirect(url_for('index'))
-
-@app.route('/ayarlar', methods=['GET', 'POST'])
-@login_required
-def ayarlar():
-    if request.method == 'POST':
-        current_user.kullanici_adi = request.form.get('kullanici_adi')
-        db.session.commit()
-        flash('Profil güncellendi!', 'info')
-    return render_template('ayarlar.html')
 
 @app.route('/giris', methods=['GET', 'POST'])
 def giris():
     if request.method == 'POST':
-        user = Kullanici.query.filter_by(eposta=request.form.get('eposta')).first()
-        if user and user.check_password(request.form.get('parola')):
-            login_user(user)
-            return redirect(url_for('index'))
-        flash('Hatalı bilgiler!', 'danger')
+        u = Kullanici.query.filter_by(eposta=request.form.get('eposta')).first()
+        if u and u.check_password(request.form.get('parola')):
+            login_user(u); return redirect(url_for('index'))
     return render_template('giris.html')
 
 @app.route('/kayitol', methods=['GET', 'POST'])
 def kayitol():
     if request.method == 'POST':
-        if Kullanici.query.filter_by(eposta=request.form.get('eposta')).first():
-            flash('E-posta kayıtlı!', 'warning')
-        else:
-            yeni = Kullanici(kullanici_adi=request.form.get('kullanici_adi'), eposta=request.form.get('eposta'))
-            yeni.set_password(request.form.get('parola'))
-            db.session.add(yeni); db.session.commit()
-            return redirect(url_for('giris'))
+        y = Kullanici(kullanici_adi=request.form.get('kullanici_adi'), eposta=request.form.get('eposta'))
+        y.set_password(request.form.get('parola'))
+        db.session.add(y); db.session.commit()
+        return redirect(url_for('giris'))
     return render_template('kayitol.html')
 
-@app.route('/cikis')
-def cikis():
-    logout_user(); return redirect(url_for('giris'))
+@app.route('/ayarlar')
+@login_required
+def ayarlar(): return render_template('ayarlar.html')
 
-with app.app_context():
-    db.create_all()
+@app.route('/cikis')
+def cikis(): logout_user(); return redirect(url_for('giris'))
+
+with app.app_context(): db.create_all()
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))

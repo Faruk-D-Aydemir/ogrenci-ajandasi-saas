@@ -1,38 +1,26 @@
 <!DOCTYPE html>
-<html lang="tr" data-bs-theme="light">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ajanda PRO</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .card { border-radius: 15px; border: none; }
-        .navbar { background: #0d6efd !important; }
+        body { background-color: #1a1f2b; color: white; }
+        .navbar { background-color: #0d6efd !important; border-bottom: 2px solid #2c3444; }
     </style>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark shadow mb-4">
         <div class="container">
             <a class="navbar-brand fw-bold" href="/">🚀 Ajanda PRO</a>
-            <div class="d-flex align-items-center">
-                <button class="btn btn-sm btn-outline-light me-3" id="btnSwitch">🌙 Mod</button>
+            <div>
                 {% if current_user.is_authenticated %}
-                <a href="/ayarlar" class="btn btn-sm btn-light me-2">Ayarlar</a>
-                <a href="/cikis" class="btn btn-sm btn-danger">Çıkış</a>
+                <a href="/ayarlar" class="btn btn-sm btn-outline-light">Ayarlar</a>
+                <a href="/cikis" class="btn btn-sm btn-danger ms-2">Çıkış</a>
                 {% endif %}
             </div>
         </div>
     </nav>
-    <div class="container">
-        {% block content %}{% endblock %}
-    </div>
-    <script>
-        document.getElementById('btnSwitch').addEventListener('click', () => {
-            const theme = document.documentElement.getAttribute('data-bs-theme') == 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-bs-theme', theme);
-            localStorage.setItem('theme', theme);
-        });
-        document.documentElement.setAttribute('data-bs-theme', localStorage.getItem('theme') || 'light');
-    </script>
+    {% block content %}{% endblock %}
 </body>
 </html>
